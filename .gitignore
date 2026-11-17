@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Env
+.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Data (large files not committed; pipeline re-fetches/re-derives)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# ML artifacts
+ml/models/*.joblib
+ml/models/*.pkl
+
+# OS
+.DS_Store
+
+# Vendored local Postgres (Postgres.app binaries + data dir), downloaded dmg
+.tools/

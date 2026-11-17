@@ -1,0 +1,52 @@
+# Optional containerized stack -- an alternative to the local dev setup in
+# README.md (which uses a vendored Postgres.app + a venv, since Docker wasn't
+# available in the original dev environment). Use this for a clean deploy or
+# on a machine that does have Docker.
+#
+#   docker compose up --build
+#
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-courtiq}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-courtiq_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-courtiq}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-courtiq}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-courtiq}:${POSTGRES_PASSWORD:-courtiq_dev_password}@db:5432/${POSTGRES_DB:-courtiq}
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api
+    ports:
+      - "5173:5173"
+
+volumes:
+  pgdata:
