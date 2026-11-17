@@ -139,7 +139,12 @@ def main():
         ]
         stats_df = df[stat_cols].rename(columns={"team": "team_abbr", "opponent": "opponent_abbr", "home": "is_home"})
 
-        records = stats_df.to_dict(orient="records")
+        # NaN -> real SQL NULL (fg_pct/fg3_pct/ft_pct are NaN whenever attempts
+        # are 0, e.g. a player who took no 3s that game). Must cast to object
+        # dtype FIRST: assigning None into a float64 column silently reverts to
+        # NaN again, since pandas can't hold None in a numeric dtype column --
+        # the same bug fixed in build_features.py (see its comment for detail).
+        records = stats_df.astype(object).where(pd.notnull(stats_df), None).to_dict(orient="records")
         chunk = 5000
         for i in range(0, len(records), chunk):
             conn.execute(PlayerGameStat.__table__.insert(), records[i : i + chunk])

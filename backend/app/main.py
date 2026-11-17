@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.api import players, compare, predict, teams
 
 settings = get_settings()
 
@@ -24,3 +25,9 @@ app.add_middleware(
 @app.get("/api/health")
 def health_check():
     return {"status": "ok"}
+
+
+app.include_router(teams.router)
+app.include_router(players.router)
+app.include_router(compare.router)
+app.include_router(predict.router)

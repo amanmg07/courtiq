@@ -4,9 +4,8 @@ A full-stack NBA analytics and predictive modeling platform: player search,
 multi-player comparison, opponent matchup analysis, trend exploration, and
 ML-based predictions for points/rebounds/assists.
 
-**Status:** Phase 1 complete — database schema, data ingestion pipeline, and
-leakage-safe feature engineering pipeline are built, loaded, and verified.
-Backend API, ML models, and frontend are not yet built (see Roadmap).
+**Status:** Phase 1 (database + data pipeline) and Phase 2 (backend API) are
+complete and tested. ML models and frontend are not yet built (see Roadmap).
 
 ## Architecture
 
@@ -90,6 +89,52 @@ verified directly (see Verification below), not just asserted:
   opponent, prior meetings only (spans seasons)
 - Career games played to date, days of rest since the previous game
 
+## Backend API
+
+FastAPI, modular by layer: `app/api/` (routers, HTTP concerns only) →
+`app/services/` (SQL/business logic, framework-agnostic) → `app/db/models.py`
+(schema). `app/schemas/` holds the Pydantic request/response models.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/teams` | All 30 teams |
+| `GET /api/players?limit=&offset=` | All players, paginated |
+| `GET /api/players/search?q=` | Search by name |
+| `GET /api/players/{id}` | Player detail + career averages |
+| `GET /api/players/{id}/gamelog?season=&opponent=&limit=&offset=` | Game-by-game box scores |
+| `GET /api/players/{id}/season-averages` | Per-season + career aggregates (shooting % = ΣmakesΣattempts, not averaged) |
+| `GET /api/players/{id}/trends?season=&last_n=` | Time series with L5/L10 rolling averages, for charting |
+| `GET /api/players/{id}/matchup/{opponent}?season=` | History vs. one specific opponent, home/away split |
+| `GET /api/compare?player_ids=1,2,3&season=` | Side-by-side averages for 2–6 players |
+| `POST /api/predict` | **Not yet available — returns 503.** Models aren't trained yet (next phase); the request/response contract is final so the frontend can integrate now. |
+
+Run it:
+```bash
+cd backend
+PYTHONPATH=. uvicorn app.main:app --reload --port 8000
+# interactive docs: http://localhost:8000/docs
+```
+
+Tests (18, integration-style against the real dev DB — this is a data app,
+so the SQL itself is what needs covering):
+```bash
+python -m pytest   # from project root; pytest.ini points at backend/tests
+```
+
+**A bug the tests caught:** the same "`None` into a float64/int64 pandas
+column silently reverts to `NaN`" issue fixed in `build_features.py` during
+Phase 1 also existed, unfixed, in `ingest_data.py`'s shooting-percentage
+calculation — `fg_pct`/`fg3_pct`/`ft_pct` were stored as literal Postgres
+`NaN` (not `NULL`) whenever a player had 0 attempts (e.g. no 3-point
+attempts that game: 27,808 of 134,960 rows). This didn't error on insert
+(Postgres floats accept `NaN`), so Phase 1's verification missed it — it
+surfaced when the `/trends` endpoint tried to JSON-serialize a response
+containing one, since strict JSON has no `NaN` token. Fixed the same way
+(cast to object dtype before replacing), re-ran ingestion + features, and
+added a regression test (`test_trends_no_leakage_on_first_game_of_dataset`)
+plus direct DB checks so this class of bug can't hide behind `IS NOT NULL`
+again.
+
 ## Setup
 
 ### Prerequisites
@@ -161,6 +206,6 @@ change or to pick up newly played games in the current season.
 
 ## Roadmap (not yet built)
 
-- [ ] FastAPI routes: players, search, game logs, season averages, compare, matchup, trends, predict
-- [ ] ML training pipeline: Linear/Multiple Regression + Random Forest for pts/reb/ast, time-based train/test split, MAE/RMSE/R² evaluation
+- [x] FastAPI routes: players, search, game logs, season averages, compare, matchup, trends
+- [ ] ML training pipeline: Linear/Multiple Regression + Random Forest for pts/reb/ast, time-based train/test split, MAE/RMSE/R² evaluation, then wire `predict_service.py` + `/api/predict` to it
 - [ ] React frontend: dashboard, player search, comparison, matchup analysis, predictions
