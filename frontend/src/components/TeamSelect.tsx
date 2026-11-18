@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react'
-import { api } from '../api/client'
-import type { TeamOut } from '../types/api'
+import { useTeams } from '../hooks/useTeams'
 
 interface Props {
   value: string
@@ -9,11 +7,7 @@ interface Props {
 }
 
 export default function TeamSelect({ value, onChange, excludeAbbr }: Props) {
-  const [teams, setTeams] = useState<TeamOut[]>([])
-
-  useEffect(() => {
-    api.teams().then(setTeams).catch(() => setTeams([]))
-  }, [])
+  const teams = useTeams()
 
   return (
     <select

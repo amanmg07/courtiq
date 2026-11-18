@@ -4,6 +4,8 @@ import { useFetch } from '../hooks/useFetch'
 import { LoadingState, ErrorState, EmptyState } from '../components/StatusStates'
 import PlayerAutocomplete from '../components/PlayerAutocomplete'
 import ComparisonBarChart from '../components/ComparisonBarChart'
+import PlayerAvatar from '../components/PlayerAvatar'
+import TeamBadge from '../components/TeamBadge'
 import type { PlayerOut } from '../types/api'
 
 const SERIES_COLORS = [
@@ -67,10 +69,12 @@ export default function ComparePage() {
           {selected.map((p, i) => (
             <span
               key={p.player_id}
-              className="flex items-center gap-2 rounded-full border border-border bg-surface-1 px-3 py-1.5 text-sm"
+              className="flex items-center gap-2 rounded-full border-2 bg-surface-1 py-1 pl-1 pr-3 text-sm"
+              style={{ borderColor: SERIES_COLORS[i % SERIES_COLORS.length] }}
             >
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SERIES_COLORS[i % SERIES_COLORS.length] }} />
+              <PlayerAvatar src={p.headshot_url} name={p.full_name} size="sm" />
               {p.full_name}
+              <TeamBadge abbreviation={p.current_team} />
               <button
                 onClick={() => setSelected((s) => s.filter((x) => x.player_id !== p.player_id))}
                 className="text-ink-muted hover:text-critical"
@@ -113,8 +117,12 @@ export default function ComparePage() {
                 {data.players.map((entry, i) => (
                   <tr key={entry.player.player_id} className="border-b border-border/50 last:border-0">
                     <td className="px-4 py-2.5 font-medium text-ink-primary">
-                      <span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: SERIES_COLORS[i % SERIES_COLORS.length] }} />
-                      {entry.player.full_name}
+                      <div className="flex items-center gap-2.5">
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: SERIES_COLORS[i % SERIES_COLORS.length] }} />
+                        <PlayerAvatar src={entry.player.headshot_url} name={entry.player.full_name} size="sm" />
+                        <span>{entry.player.full_name}</span>
+                        <TeamBadge abbreviation={entry.player.current_team} />
+                      </div>
                     </td>
                     <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{entry.stats.games_played}</td>
                     <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{entry.stats.avg_minutes.toFixed(1)}</td>

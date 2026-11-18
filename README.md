@@ -101,14 +101,17 @@ FastAPI, modular by layer: `app/api/` (routers, HTTP concerns only) →
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/teams` | All 30 teams |
+| `GET /api/teams` | All 30 teams, with real brand colors |
 | `GET /api/players?limit=&offset=` | All players, paginated |
 | `GET /api/players/search?q=` | Search by name |
 | `GET /api/players/{id}` | Player detail + career averages |
+| `GET /api/players/{id}/headshot` | Proxies the player's real NBA.com headshot (see "User feedback pass" below for why it's proxied, not a direct CDN link) |
 | `GET /api/players/{id}/gamelog?season=&opponent=&limit=&offset=` | Game-by-game box scores |
 | `GET /api/players/{id}/season-averages` | Per-season + career aggregates (shooting % = ΣmakesΣattempts, not averaged) |
 | `GET /api/players/{id}/trends?season=&last_n=` | Time series with L5/L10 rolling averages, for charting |
 | `GET /api/players/{id}/matchup/{opponent}?season=` | History vs. one specific opponent, home/away split |
+| `GET /api/players/{id}/upcoming?limit=` | The player's next real, unplayed games (live ESPN lookup — our own DB has no future games by design; see below) |
+| `GET /api/leaders?stat=pts\|reb\|ast\|stl\|blk&season=&limit=` | True season leaders, **no games-played floor** (changed on request — see below) |
 | `GET /api/compare?player_ids=1,2,3&season=` | Side-by-side averages for 2–6 players |
 | `POST /api/predict` | Predicted pts/reb/ast for a player vs. an opponent, using whichever trained model had the lowest measured test-set MAE per stat. Returns 503 if `scripts/train_models.py` hasn't been run (e.g. a fresh clone). |
 
@@ -146,16 +149,18 @@ only (a deliberate product choice, not a default awaiting a light mode) —
 tokens come from the `dataviz` skill's validated reference palette, so
 chart/series colors are colorblind-safe by construction rather than picked by
 eye. `pts`/`reb`/`ast` keep a fixed color (blue/orange/aqua) everywhere in the
-app; compared players take categorical slots in selection order.
+app; compared players take categorical slots in selection order. Team identity
+(real brand colors + headshots, added in the feedback pass below) layers on
+top of that system rather than replacing it.
 
 | Page | Route | What it does |
 |---|---|---|
-| Dashboard | `/` | League leaders (pts/reb/ast) for the latest season, player search |
-| Players | `/players` | Browse (paginated) or search the full player database |
-| Player Profile | `/players/:id` | Career + season-by-season stats, L5/L10 trend chart with stat tabs |
+| Dashboard | `/` | True league leaders (pts/reb/ast, no games floor) for the latest season, player search |
+| Players | `/players` | Browse (paginated) or search the full player database, with headshots + team badges |
+| Player Profile | `/players/:id` | Team-colored header with headshot, career + season-by-season stats, L5/L10 trend chart with stat tabs |
 | Compare | `/compare` | 2–6 players side-by-side, career or one season, bar chart + table |
 | Matchup | `/matchup` | A player's history vs. one opponent, home/away split, game log |
-| Predictions | `/predict` | Predicted pts/reb/ast (with each model's measured MAE) alongside real L10/season/matchup context |
+| Predictions | `/predict` | Shortcuts to the player's actual next games (real schedule, one tap to predict), predicted pts/reb/ast with measured MAE, plus real L10/season/matchup context |
 
 Structure: `src/api/client.ts` (typed fetch wrapper) → `src/hooks/useFetch.ts`
 (loading/error state) → `src/pages/*` (one per route) → `src/components/*`
@@ -336,6 +341,68 @@ PYTHONPATH=backend .venv/bin/python ml/evaluation/plots.py     # regenerates doc
 ```
 (`ml/models/*.joblib` are gitignored — regenerate them after cloning, before
 `/api/predict` will return 200 instead of 503. `metrics.json` is committed.)
+
+## User feedback pass
+
+Four pieces of direct feedback after using the app, each investigated rather
+than assumed:
+
+**1. "Home and away don't make any difference" for predictions.** Checked
+directly, not just explained away: calling `/api/predict` with `is_home=true`
+vs. `false` for the same player/opponent *does* change the prediction (e.g.
+LeBron vs. DEN: 15.9 vs. 15.7 predicted points), but by a genuinely small
+margin — small enough that rebounds can round to the identical displayed
+value. That's not a bug: `is_home` showed near-zero importance in the Random
+Forest feature chart because the player's separate home/away *split
+averages* (`pts_home_avg`/`pts_away_avg`) already carry most of that signal,
+so the flag's marginal contribution on top of them is small — and real
+NBA home-court advantage is itself modest. Rather than artificially
+inflate the effect, added an explicit note in the UI next to the toggle
+explaining this honestly.
+
+**2. League leaders had an undisclosed `min. 15 games` qualifier.** Removed —
+`GET /api/leaders` now has no games-played floor by request (true season
+leaders, not an "official qualifier" cutoff); a hot start with few games
+played is now eligible to lead.
+
+**3. "Show the player's next few games with one-tap predictions."**
+CourtIQ's own database only has *historical* box scores by design — a future
+game has no box score to load. Rather than fake a schedule, checked several
+free (no-API-key) sources for a *real* one: `stats.nba.com`/`data.nba.net`
+were unreachable from this environment, `balldontlie.io` now requires a free
+signup. **ESPN's public site API** (`site.api.espn.com`, no key) worked and
+was verified directly against all 30 teams — 6 need a different abbreviation
+than ours internally (GSW→`gs`, NOP→`no`, NYK→`ny`, SAN→`sa`, UTA→`utah`,
+WAS→`wsh`), discovered by querying each one rather than guessing. New
+service (`schedule_service.py`) and endpoint fetch it live (never stored —
+if ESPN is slow/down, the shortcuts row just doesn't render, not a crash).
+The Predictions page now shows a player's next 5 real games; tapping one
+sets the opponent/location and generates the prediction immediately.
+
+**4. "UI is too bland — headshots, more consistent coloring."** Two additions:
+- **Real NBA team colors** (public brand info, not fabricated) added to the
+  `teams` table and used for a `TeamBadge` component everywhere a team
+  appears, plus a team-colored gradient banner on the player profile header.
+- **Real NBA.com player headshots.** Verified the CDN URL pattern works
+  (our `player_id` values are real NBA.com person IDs) — but then found,
+  while actually testing in a browser rather than assuming `curl` success
+  meant it would work everywhere, that Chromium reproducibly fails to load
+  images from `cdn.nba.com` with `net::ERR_HTTP2_PROTOCOL_ERROR`, even for a
+  single image with zero concurrency, while the same browser loads images
+  from other hosts fine and `curl`/server-side Python succeed against the
+  same NBA URL every time. That's a real client/CDN incompatibility, not a
+  sandbox artifact or a rate limit — so rather than ship something that
+  might silently show fallback initials for every viewer, added
+  `GET /api/players/{id}/headshot`, which fetches the image server-side
+  (where it works) and streams it back; the frontend only ever talks to our
+  own API. `PlayerAvatar` still keeps an `onError` fallback to an initials
+  circle for genuine failures (network issues, an obscure player id).
+
+All four verified end-to-end with the same headless-Playwright smoke suite
+(0 console errors) and backend tests (`test_leaders_has_no_games_played_floor`,
+`test_upcoming_games_real_schedule_or_gracefully_empty`,
+`test_headshot_proxy_serves_real_image`, team-color assertions in
+`test_list_teams`) before being called done.
 
 ## Possible extensions (beyond the original spec)
 

@@ -8,3 +8,5 @@ class TeamOut(BaseModel):
     name: str
     conference: str
     division: str
+    primary_color: str
+    secondary_color: str

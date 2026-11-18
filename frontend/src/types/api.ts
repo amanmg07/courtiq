@@ -6,6 +6,8 @@ export interface TeamOut {
   name: string
   conference: string
   division: string
+  primary_color: string
+  secondary_color: string
 }
 
 export interface PlayerOut {
@@ -15,6 +17,7 @@ export interface PlayerOut {
   last_season: string | null
   games_played: number
   current_team: string | null
+  headshot_url: string
 }
 
 export interface PlayerListResponse {
@@ -179,6 +182,17 @@ export interface PredictionResponse {
   reb: StatPrediction
   ast: StatPrediction
   model_info: string
+}
+
+export interface UpcomingGame {
+  game_date: string // ISO 8601 UTC
+  opponent_abbr: string
+  is_home: boolean
+}
+
+export interface UpcomingGamesResponse {
+  player: PlayerOut
+  games: UpcomingGame[]
 }
 
 export interface ApiError {

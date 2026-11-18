@@ -1,13 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+import urllib.request
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.schemas.player import PlayerOut, PlayerListResponse, PlayerDetail
 from app.schemas.stats import (
     GameLogEntry, GameLogResponse, SeasonAverage, SeasonAveragesResponse,
     TrendPoint, TrendsResponse, MatchupGame, MatchupResponse,
+    UpcomingGame, UpcomingGamesResponse,
 )
-from app.services import player_service, matchup_service
+from app.services import player_service, matchup_service, schedule_service
 
 router = APIRouter(prefix="/api/players", tags=["players"])
 
@@ -15,6 +19,18 @@ router = APIRouter(prefix="/api/players", tags=["players"])
 def _f(value) -> float | None:
     """Postgres numeric aggregates come back as Decimal (or None) -- normalize to float."""
     return None if value is None else float(value)
+
+
+def _headshot_url(player_id: int) -> str:
+    # Proxied through our own API (see get_headshot below), NOT a direct
+    # cdn.nba.com URL: verified that URL loads fine via curl and server-side
+    # Python, but reliably fails in Chromium specifically with
+    # net::ERR_HTTP2_PROTOCOL_ERROR (reproduced with a single image, zero
+    # concurrency, confirmed other HTTPS hosts work fine in the same
+    # browser -- so this is a real NBA-CDN/Chromium HTTP-2 incompatibility,
+    # not a sandbox artifact or a rate-limit). Proxying sidesteps it entirely:
+    # the browser only ever talks to our own server.
+    return f"{get_settings().public_base_url}/api/players/{player_id}/headshot"
 
 
 def _to_player_out(player, current_team: str | None = None) -> PlayerOut:
@@ -25,6 +41,7 @@ def _to_player_out(player, current_team: str | None = None) -> PlayerOut:
         last_season=player.last_season,
         games_played=player.games_played,
         current_team=current_team,
+        headshot_url=_headshot_url(player.player_id),
     )
 
 
@@ -193,4 +210,45 @@ def get_matchup(
         home_avg_pts=_f(agg.home_avg_pts),
         away_avg_pts=_f(agg.away_avg_pts),
         recent_games=[MatchupGame.model_validate(g) for g in recent_games],
+    )
+
+
+@router.get("/{player_id}/headshot")
+def get_headshot(player_id: int):
+    """Proxies the player's real NBA.com headshot (see _headshot_url's
+    comment for why: it's a Chromium/cdn.nba.com HTTP-2 incompatibility,
+    not a hotlink or CORS restriction). No DB lookup needed -- the id
+    pattern is the same regardless of whether the id is a real player."""
+    url = f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            image_bytes = resp.read()
+            content_type = resp.headers.get("Content-Type", "image/png")
+    except Exception:
+        raise HTTPException(status_code=502, detail="Headshot temporarily unavailable")
+
+    return Response(
+        content=image_bytes,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},  # static content; let the browser cache it
+    )
+
+
+@router.get("/{player_id}/upcoming", response_model=UpcomingGamesResponse)
+def get_upcoming_games(
+    player_id: int,
+    limit: int = Query(5, ge=1, le=15),
+    db: Session = Depends(get_db),
+):
+    """The player's team's next games that haven't been played yet, for
+    Predictions-page shortcuts. Live lookup (ESPN's public schedule, no key
+    needed) -- our own DB has no future games by design. Returns an empty
+    list, never an error, if the team is unknown or ESPN is unreachable."""
+    player = _get_player_or_404(db, player_id)
+    team = player_service.get_current_teams(db, [player_id]).get(player_id)
+    games = schedule_service.get_upcoming_games(team, limit=limit) if team else []
+    return UpcomingGamesResponse(
+        player=_to_player_out(player, team),
+        games=[UpcomingGame(**g) for g in games],
     )

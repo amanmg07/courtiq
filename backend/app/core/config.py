@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     cors_origins: str = "http://localhost:5173"
+    # The URL the FRONTEND should use to reach this API -- used to build
+    # absolute URLs (e.g. headshot_url) returned in API responses. Defaults
+    # to match VITE_API_BASE_URL's own default.
+    public_base_url: str = "http://localhost:8000"
 
     @property
     def cors_origin_list(self) -> list[str]:

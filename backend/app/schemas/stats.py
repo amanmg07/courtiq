@@ -146,3 +146,14 @@ class LeadersResponse(BaseModel):
     stat: str
     season: str
     leaders: list[LeaderEntry]
+
+
+class UpcomingGame(BaseModel):
+    game_date: str  # ISO 8601 UTC, from ESPN -- not a DB date (future games aren't in our DB)
+    opponent_abbr: str
+    is_home: bool
+
+
+class UpcomingGamesResponse(BaseModel):
+    player: PlayerOut
+    games: list[UpcomingGame]

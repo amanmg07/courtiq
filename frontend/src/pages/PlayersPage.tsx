@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
 import { LoadingState, ErrorState, EmptyState } from '../components/StatusStates'
+import PlayerAvatar from '../components/PlayerAvatar'
+import TeamBadge from '../components/TeamBadge'
 import type { PlayerOut } from '../types/api'
 
 const PAGE_SIZE = 25
@@ -68,8 +70,15 @@ export default function PlayersPage() {
                   onClick={() => navigate(`/players/${p.player_id}`)}
                   className="cursor-pointer border-b border-border/50 last:border-0 hover:bg-surface-2"
                 >
-                  <td className="px-4 py-2.5 font-medium text-ink-primary">{p.full_name}</td>
-                  <td className="px-4 py-2.5 text-ink-secondary">{p.current_team ?? '—'}</td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <PlayerAvatar src={p.headshot_url} name={p.full_name} size="sm" />
+                      <span className="font-medium text-ink-primary">{p.full_name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <TeamBadge abbreviation={p.current_team} />
+                  </td>
                   <td className="px-4 py-2.5 text-ink-secondary">{p.first_season ?? '—'}</td>
                   <td className="px-4 py-2.5 text-ink-secondary">{p.last_season ?? '—'}</td>
                   <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{p.games_played}</td>

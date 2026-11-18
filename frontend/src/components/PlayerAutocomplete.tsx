@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/client'
+import PlayerAvatar from './PlayerAvatar'
+import TeamBadge from './TeamBadge'
 import type { PlayerOut } from '../types/api'
 
 interface Props {
@@ -72,10 +74,11 @@ export default function PlayerAutocomplete({ onSelect, placeholder = 'Search pla
                   setResults([])
                   setOpen(false)
                 }}
-                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-surface-1"
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-surface-1"
               >
-                <span>{p.full_name}</span>
-                <span className="text-xs text-ink-muted">{p.current_team ?? '—'}</span>
+                <PlayerAvatar src={p.headshot_url} name={p.full_name} size="sm" />
+                <span className="flex-1 truncate">{p.full_name}</span>
+                <TeamBadge abbreviation={p.current_team} />
               </button>
             </li>
           ))}

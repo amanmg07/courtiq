@@ -5,6 +5,8 @@ import { LoadingState, ErrorState, EmptyState } from '../components/StatusStates
 import PlayerAutocomplete from '../components/PlayerAutocomplete'
 import TeamSelect from '../components/TeamSelect'
 import StatCard from '../components/StatCard'
+import PlayerAvatar from '../components/PlayerAvatar'
+import TeamBadge from '../components/TeamBadge'
 import type { PlayerOut, PredictionResponse, StatPrediction } from '../types/api'
 
 type PredictCallState =
@@ -30,6 +32,10 @@ function PredictionCard({ label, stat, accent }: { label: string; stat: StatPred
   )
 }
 
+function formatShortcutDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
 export default function PredictPage() {
   const [player, setPlayer] = useState<PlayerOut | null>(null)
   const [opponent, setOpponent] = useState('')
@@ -44,17 +50,28 @@ export default function PredictPage() {
     () => (player && opponent ? api.matchup(player.player_id, opponent) : null),
     [player?.player_id, opponent],
   )
+  // Real upcoming schedule (ESPN, live) -- lets a viewer jump straight to a
+  // prediction for the player's actual next games instead of hand-picking
+  // an opponent. CourtIQ's own DB has no future games by design (it's built
+  // from box scores, which don't exist until a game is played).
+  const upcoming = useFetch(() => (player ? api.upcomingGames(player.player_id, 5) : null), [player?.player_id])
 
-  async function handlePredict() {
-    if (!player || !opponent) return
+  async function runPrediction(targetOpponent: string, targetIsHome: boolean) {
+    if (!player || !targetOpponent) return
     setPredictState({ status: 'loading' })
     try {
-      const data = await api.predict(player.player_id, opponent, isHome)
+      const data = await api.predict(player.player_id, targetOpponent, targetIsHome)
       setPredictState({ status: 'result', data })
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Prediction service unavailable'
       setPredictState({ status: 'unavailable', message })
     }
+  }
+
+  function selectShortcut(oppAbbr: string, home: boolean) {
+    setOpponent(oppAbbr)
+    setIsHome(home)
+    runPrediction(oppAbbr, home)
   }
 
   const l10 = trend.data?.points.length ? trend.data.points[trend.data.points.length - 1] : null
@@ -69,12 +86,16 @@ export default function PredictPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3 sm:max-w-2xl">
-        <div>
-          <label className="mb-1 block text-xs text-ink-muted">Player</label>
+      <div>
+        <label className="mb-1 block text-xs text-ink-muted">Player</label>
+        <div className="max-w-sm">
           {player ? (
             <div className="flex items-center justify-between rounded-md border border-border bg-surface-1 px-3 py-2 text-sm">
-              <span>{player.full_name}</span>
+              <span className="flex items-center gap-2.5">
+                <PlayerAvatar src={player.headshot_url} name={player.full_name} size="sm" />
+                {player.full_name}
+                <TeamBadge abbreviation={player.current_team} />
+              </span>
               <button
                 onClick={() => {
                   setPlayer(null)
@@ -89,8 +110,39 @@ export default function PredictPage() {
             <PlayerAutocomplete onSelect={setPlayer} />
           )}
         </div>
+      </div>
+
+      {player && upcoming.data && upcoming.data.games.length > 0 && (
         <div>
-          <label className="mb-1 block text-xs text-ink-muted">Opponent</label>
+          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+            {player.full_name}'s Next Games — tap one to predict
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {upcoming.data.games.map((g) => (
+              <button
+                key={g.game_date}
+                onClick={() => selectShortcut(g.opponent_abbr, g.is_home)}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-surface-2 ${
+                  opponent === g.opponent_abbr && isHome === g.is_home
+                    ? 'border-series-1 bg-surface-2'
+                    : 'border-border bg-surface-1'
+                }`}
+              >
+                <div>
+                  <p className="text-ink-primary">
+                    {g.is_home ? 'vs' : '@'} <TeamBadge abbreviation={g.opponent_abbr} />
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink-muted">{formatShortcutDate(g.game_date)}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2 sm:max-w-md">
+        <div>
+          <label className="mb-1 block text-xs text-ink-muted">Or pick any opponent</label>
           <TeamSelect
             value={opponent}
             onChange={(v) => {
@@ -118,13 +170,17 @@ export default function PredictPage() {
           </div>
         </div>
       </div>
+      <p className="-mt-3 text-xs text-ink-muted">
+        Home court does shift the prediction, but typically only slightly — our model found it to be one of the
+        weakest signals once a player's own home/away scoring split is already accounted for.
+      </p>
 
       {!player || !opponent ? (
         <EmptyState message="Select a player and opponent to see predictions and current-form context." />
       ) : (
         <div className="space-y-6">
           <button
-            onClick={handlePredict}
+            onClick={() => runPrediction(opponent, isHome)}
             disabled={predictState.status === 'loading'}
             className="rounded-md bg-series-1 px-4 py-2 text-sm font-semibold text-page transition-opacity hover:opacity-90 disabled:opacity-50"
           >
@@ -140,8 +196,9 @@ export default function PredictPage() {
 
           {predictState.status === 'result' && (
             <section>
-              <h2 className="mb-3 text-lg font-semibold text-ink-primary">
-                Predicted vs. {predictState.data.opponent_abbr} ({predictState.data.is_home ? 'Home' : 'Away'})
+              <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-ink-primary">
+                Predicted vs. <TeamBadge abbreviation={predictState.data.opponent_abbr} size="md" /> (
+                {predictState.data.is_home ? 'Home' : 'Away'})
               </h2>
               <div className="grid grid-cols-3 gap-3">
                 {STAT_META.map((m) => (

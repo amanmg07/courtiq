@@ -2,9 +2,12 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
+import { useTeam } from '../hooks/useTeams'
 import { LoadingState, ErrorState } from '../components/StatusStates'
 import StatCard from '../components/StatCard'
 import TrendChart from '../components/TrendChart'
+import PlayerAvatar from '../components/PlayerAvatar'
+import TeamBadge from '../components/TeamBadge'
 
 const STAT_TABS: { key: 'pts' | 'reb' | 'ast'; label: string }[] = [
   { key: 'pts', label: 'Points' },
@@ -25,6 +28,7 @@ export default function PlayerProfilePage() {
   const detail = useFetch(() => api.playerDetail(playerId), [playerId])
   const seasons = useFetch(() => api.seasonAverages(playerId), [playerId])
   const trends = useFetch(() => api.trends(playerId, { last_n: lastN }), [playerId, lastN])
+  const team = useTeam(detail.data?.current_team)
 
   if (detail.loading) return <LoadingState label="Loading player…" />
   if (detail.error) return <ErrorState message={detail.error} />
@@ -38,15 +42,25 @@ export default function PlayerProfilePage() {
         <Link to="/players" className="text-sm text-ink-muted hover:text-ink-primary">
           ← All players
         </Link>
-        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-3xl font-bold text-ink-primary">{p.full_name}</h1>
-          <div className="flex items-center gap-2 text-sm text-ink-secondary">
-            <span className="rounded-full border border-border bg-surface-1 px-2.5 py-1 font-medium">
-              {p.current_team ?? '—'}
-            </span>
-            <span>
-              {p.first_season}–{p.last_season} · {p.games_played} games
-            </span>
+        <div
+          className="mt-2 overflow-hidden rounded-xl border border-border p-5"
+          style={{
+            background: team
+              ? `linear-gradient(135deg, ${team.primary_color}33 0%, var(--color-surface-1) 65%)`
+              : 'var(--color-surface-1)',
+          }}
+        >
+          <div className="flex flex-wrap items-center gap-4">
+            <PlayerAvatar src={p.headshot_url} name={p.full_name} size="xl" ringColor={team?.primary_color} />
+            <div className="min-w-0 flex-1">
+              <h1 className="text-3xl font-bold text-ink-primary">{p.full_name}</h1>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
+                <TeamBadge abbreviation={p.current_team} size="md" />
+                <span>
+                  {p.first_season}–{p.last_season} · {p.games_played} games
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

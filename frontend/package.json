@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "smoke": "node e2e/smoke.mjs",
     "smoke:interactive": "node e2e/smoke-interactive.mjs",
-    "smoke:mobile": "node e2e/smoke-mobile.mjs"
+    "smoke:mobile": "node e2e/smoke-mobile.mjs",
+    "smoke:predict-shortcuts": "node e2e/smoke-predict-shortcuts.mjs"
   },
   "dependencies": {
     "react": "^19.3.1",

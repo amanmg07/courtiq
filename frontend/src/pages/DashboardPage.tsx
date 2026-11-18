@@ -4,6 +4,8 @@ import { api } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
 import { LoadingState, ErrorState } from '../components/StatusStates'
 import PlayerAutocomplete from '../components/PlayerAutocomplete'
+import PlayerAvatar from '../components/PlayerAvatar'
+import TeamBadge from '../components/TeamBadge'
 import type { LeaderEntry } from '../types/api'
 
 const LEADER_STATS: { key: 'pts' | 'reb' | 'ast'; label: string; accent: string; suffix: string }[] = [
@@ -26,10 +28,14 @@ function LeaderBoard({ title, accent, leaders, suffix }: { title: string; accent
               className="group flex w-full items-center gap-3 text-left"
             >
               <span className="w-4 shrink-0 text-xs font-medium text-ink-muted">{i + 1}</span>
+              <PlayerAvatar src={entry.player.headshot_url} name={entry.player.full_name} size="sm" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm text-ink-primary group-hover:underline">
-                    {entry.player.full_name}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-sm text-ink-primary group-hover:underline">
+                      {entry.player.full_name}
+                    </span>
+                    <TeamBadge abbreviation={entry.player.current_team} />
                   </span>
                   <span className="tabular shrink-0 text-sm font-semibold text-ink-primary">
                     {entry.avg_value.toFixed(1)} <span className="text-xs text-ink-muted">{suffix}</span>
@@ -83,7 +89,7 @@ export default function DashboardPage() {
       <section>
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="text-lg font-semibold text-ink-primary">League Leaders</h2>
-          {season && <span className="text-sm text-ink-muted">{season} season · min. 15 games</span>}
+          {season && <span className="text-sm text-ink-muted">{season} season</span>}
         </div>
         {loading && <LoadingState label="Loading league leaders…" />}
         {error && <ErrorState message={error} />}

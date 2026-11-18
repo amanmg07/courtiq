@@ -24,7 +24,7 @@ def get_leaders(
     stat: str,
     season: str | None = None,
     limit: int = 10,
-    min_games: int = 15,
+    min_games: int = 1,  # effectively no floor -- user asked for true season leaders, not an "official qualifier" cutoff
 ):
     season = season or get_latest_season(db)
     col = STAT_COLUMNS[stat]

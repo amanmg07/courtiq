@@ -116,7 +116,11 @@ def main():
 
         conn.execute(
             Team.__table__.insert(),
-            [{"abbreviation": a, "name": n, "conference": c, "division": d} for a, n, c, d in TEAMS],
+            [
+                {"abbreviation": a, "name": n, "conference": c, "division": d,
+                 "primary_color": pc, "secondary_color": sc}
+                for a, n, c, d, pc, sc in TEAMS
+            ],
         )
 
         conn.execute(

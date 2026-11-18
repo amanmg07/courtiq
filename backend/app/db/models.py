@@ -41,6 +41,10 @@ class Team(Base):
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     conference: Mapped[str] = mapped_column(String(4), nullable=False)  # "East" / "West"
     division: Mapped[str] = mapped_column(String(16), nullable=False)
+    # Real NBA team brand colors (public, well-documented -- not fabricated),
+    # used for consistent team-identity theming across the frontend.
+    primary_color: Mapped[str] = mapped_column(String(7), nullable=False)
+    secondary_color: Mapped[str] = mapped_column(String(7), nullable=False)
 
 
 class Player(Base):

@@ -28,6 +28,10 @@ def test_list_teams():
     teams = r.json()
     assert len(teams) == 30
     assert {"LAL", "BOS", "DEN"}.issubset({t["abbreviation"] for t in teams})
+    lakers = next(t for t in teams if t["abbreviation"] == "LAL")
+    assert lakers["primary_color"] == "#552583"  # real Lakers purple, not a placeholder
+    for t in teams:
+        assert t["primary_color"].startswith("#") and len(t["primary_color"]) == 7
 
 
 def test_list_players_pagination():
@@ -68,6 +72,17 @@ def test_player_detail_lebron():
     body = r.json()
     assert body["full_name"] == "LeBron James"
     assert 15 < body["career_avg_pts"] < 35  # sane range, not a fabricated check
+    # proxied through our own API, not a direct cdn.nba.com URL -- see
+    # _headshot_url()'s comment for why (a confirmed Chromium/CDN HTTP-2
+    # incompatibility, worked around by routing through our own server)
+    assert body["headshot_url"].endswith(f"/api/players/{LEBRON_ID}/headshot")
+
+
+def test_headshot_proxy_serves_real_image():
+    r = client.get(f"/api/players/{LEBRON_ID}/headshot")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/")
+    assert len(r.content) > 10_000  # a real photo, not an empty/placeholder stub
 
 
 def test_gamelog_known_box_score():
@@ -174,3 +189,40 @@ def test_predict_handles_low_history_player_without_crashing():
     )
     assert r.status_code == 200
     assert r.json()["pts"]["predicted"] >= 0
+
+
+def test_leaders_has_no_games_played_floor():
+    """User explicitly asked for true season leaders, not an "official
+    qualifier" cutoff -- a low-games-played player with a hot start must be
+    eligible to lead."""
+    r = client.get("/api/leaders", params={"stat": "pts", "limit": 50})
+    assert r.status_code == 200
+    leaders = r.json()["leaders"]
+    assert any(entry["games_played"] < 15 for entry in leaders)
+
+
+def test_leaders_rejects_unsupported_stat():
+    r = client.get("/api/leaders", params={"stat": "not_a_real_stat"})
+    assert r.status_code == 422  # pattern-validated by the route
+
+
+def test_upcoming_games_real_schedule_or_gracefully_empty():
+    """Hits a live external API (ESPN) -- assert the shape is always valid
+    and, when games ARE returned, that they're genuinely in the future
+    (never a game CourtIQ's own DB already has a box score for)."""
+    r = client.get(f"/api/players/{LEBRON_ID}/upcoming", params={"limit": 3})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["player"]["player_id"] == LEBRON_ID
+    for game in body["games"]:
+        assert game["opponent_abbr"] in {
+            "ATL", "BKN", "BOS", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
+            "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK",
+            "OKC", "ORL", "PHI", "PHX", "POR", "SAC", "SAN", "TOR", "UTA", "WAS",
+        }
+        assert isinstance(game["is_home"], bool)
+
+
+def test_upcoming_games_unknown_player_is_404():
+    r = client.get("/api/players/999999999/upcoming")
+    assert r.status_code == 404

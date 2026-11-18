@@ -7,6 +7,8 @@ import PlayerAutocomplete from '../components/PlayerAutocomplete'
 import TeamSelect from '../components/TeamSelect'
 import StatCard from '../components/StatCard'
 import ChartTooltip from '../components/ChartTooltip'
+import PlayerAvatar from '../components/PlayerAvatar'
+import TeamBadge from '../components/TeamBadge'
 import type { PlayerOut } from '../types/api'
 
 function formatDate(iso: string) {
@@ -42,7 +44,11 @@ export default function MatchupPage() {
           <label className="mb-1 block text-xs text-ink-muted">Player</label>
           {player ? (
             <div className="flex items-center justify-between rounded-md border border-border bg-surface-1 px-3 py-2 text-sm">
-              <span>{player.full_name}</span>
+              <span className="flex items-center gap-2.5">
+                <PlayerAvatar src={player.headshot_url} name={player.full_name} size="sm" />
+                {player.full_name}
+                <TeamBadge abbreviation={player.current_team} />
+              </span>
               <button onClick={() => setPlayer(null)} className="text-ink-muted hover:text-critical">
                 ×
               </button>
