@@ -134,3 +134,15 @@ class ComparisonEntry(BaseModel):
 class ComparisonResponse(BaseModel):
     season: str  # the requested season, or "career"
     players: list[ComparisonEntry]
+
+
+class LeaderEntry(BaseModel):
+    player: PlayerOut
+    avg_value: float
+    games_played: int
+
+
+class LeadersResponse(BaseModel):
+    stat: str
+    season: str
+    leaders: list[LeaderEntry]

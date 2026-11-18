@@ -4,8 +4,10 @@ A full-stack NBA analytics and predictive modeling platform: player search,
 multi-player comparison, opponent matchup analysis, trend exploration, and
 ML-based predictions for points/rebounds/assists.
 
-**Status:** Phase 1 (database + data pipeline) and Phase 2 (backend API) are
-complete and tested. ML models and frontend are not yet built (see Roadmap).
+**Status:** Phase 1 (database + data pipeline), Phase 2 (backend API), and
+Phase 4 (frontend) are complete and tested — done out of order at the user's
+request, so the Predictions page is real UI wired to a real (not yet trained)
+endpoint. ML models are not yet built (see Roadmap).
 
 ## Architecture
 
@@ -135,6 +137,63 @@ added a regression test (`test_trends_no_leakage_on_first_game_of_dataset`)
 plus direct DB checks so this class of bug can't hide behind `IS NOT NULL`
 again.
 
+## Frontend
+
+React 19 + TypeScript + Tailwind v4 + Recharts, built with Vite. Dark theme
+only (a deliberate product choice, not a default awaiting a light mode) —
+tokens come from the `dataviz` skill's validated reference palette, so
+chart/series colors are colorblind-safe by construction rather than picked by
+eye. `pts`/`reb`/`ast` keep a fixed color (blue/orange/aqua) everywhere in the
+app; compared players take categorical slots in selection order.
+
+| Page | Route | What it does |
+|---|---|---|
+| Dashboard | `/` | League leaders (pts/reb/ast) for the latest season, player search |
+| Players | `/players` | Browse (paginated) or search the full player database |
+| Player Profile | `/players/:id` | Career + season-by-season stats, L5/L10 trend chart with stat tabs |
+| Compare | `/compare` | 2–6 players side-by-side, career or one season, bar chart + table |
+| Matchup | `/matchup` | A player's history vs. one opponent, home/away split, game log |
+| Predictions | `/predict` | Real UI wired to the real `/api/predict` endpoint — shows its honest 503 ("not trained yet") alongside real L10/season/matchup context pulled from other endpoints |
+
+Structure: `src/api/client.ts` (typed fetch wrapper) → `src/hooks/useFetch.ts`
+(loading/error state) → `src/pages/*` (one per route) → `src/components/*`
+(shared: layout, autocomplete, team select, stat card, chart wrappers).
+`src/types/api.ts` mirrors the backend Pydantic schemas by hand (no codegen
+yet — keep both in sync when either changes).
+
+Run it:
+```bash
+cd frontend
+npm install
+npm run dev   # http://localhost:5173 (needs the backend running on :8000)
+```
+
+**Verification:** no interactive browser was available in this environment
+(no Chrome extension connected), so this was tested with a headless
+Playwright Chromium instead — `npm run smoke` (every route, fresh page,
+captures console errors) and `npm run smoke:interactive` (fills in real
+selections: a player + opponent on Matchup/Predict, two players on Compare)
+write PNGs to `frontend/screenshots/` (gitignored) and print any console
+errors per page.
+
+**Two real bugs this verification caught and fixed:**
+1. `PlayerAutocomplete`'s `excludeIds` prop defaulted via `= []`. A JS default
+   parameter allocates a *new* array every time the function runs — including
+   a re-render triggered by the component's *own* internal state, independent
+   of its parent. That new reference fed the search-debounce effect's
+   dependency array, re-triggering the effect every render: a self-sustaining
+   infinite loop, entirely self-contained, whenever a caller omitted the prop
+   (Dashboard, Matchup, Predict all did). It didn't surface on Compare only
+   because there the prop was actually passed through from the parent.
+   Fixed with a module-level constant array instead of a fresh literal.
+2. (Not a bug, but worth recording:) a bar chart briefly screenshotted as
+   empty — turned out to be Recharts' default ~1.5s enter animation caught
+   mid-flight by a 1-second wait in the test script, not broken rendering
+   (confirmed by re-reading the DOM: valid `<path>` geometry, correct resolved
+   `fill` color, just not yet animated in). Disabled enter animations on all
+   charts app-wide (`isAnimationActive={false}`) since instant rendering suits
+   a dense analytics dashboard and makes automated verification deterministic.
+
 ## Setup
 
 ### Prerequisites
@@ -208,4 +267,4 @@ change or to pick up newly played games in the current season.
 
 - [x] FastAPI routes: players, search, game logs, season averages, compare, matchup, trends
 - [ ] ML training pipeline: Linear/Multiple Regression + Random Forest for pts/reb/ast, time-based train/test split, MAE/RMSE/R² evaluation, then wire `predict_service.py` + `/api/predict` to it
-- [ ] React frontend: dashboard, player search, comparison, matchup analysis, predictions
+- [x] React frontend: dashboard, player search, comparison, matchup analysis, predictions (built ahead of ML at the user's request; Predictions page shows real context + an honest "not trained yet" state)

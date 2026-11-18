@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.api import players, compare, predict, teams
+from app.api import players, compare, predict, teams, leaders
 
 settings = get_settings()
 
@@ -31,3 +31,4 @@ app.include_router(teams.router)
 app.include_router(players.router)
 app.include_router(compare.router)
 app.include_router(predict.router)
+app.include_router(leaders.router)
