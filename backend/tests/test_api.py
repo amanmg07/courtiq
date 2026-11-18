@@ -30,8 +30,13 @@ def test_list_teams():
     assert {"LAL", "BOS", "DEN"}.issubset({t["abbreviation"] for t in teams})
     lakers = next(t for t in teams if t["abbreviation"] == "LAL")
     assert lakers["primary_color"] == "#552583"  # real Lakers purple, not a placeholder
+    assert lakers["logo_url"] == "https://a.espncdn.com/i/teamlogos/nba/500/lal.png"
+    # the 6 teams whose ESPN logo path differs from our own abbreviation
+    spurs = next(t for t in teams if t["abbreviation"] == "SAN")
+    assert spurs["logo_url"].endswith("/sas.png")
     for t in teams:
         assert t["primary_color"].startswith("#") and len(t["primary_color"]) == 7
+        assert t["logo_url"].startswith("https://a.espncdn.com/")
 
 
 def test_list_players_pagination():

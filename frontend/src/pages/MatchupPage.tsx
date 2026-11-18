@@ -9,6 +9,7 @@ import TeamSelect from '../components/TeamSelect'
 import StatCard from '../components/StatCard'
 import ChartTooltip from '../components/ChartTooltip'
 import PlayerAvatar from '../components/PlayerAvatar'
+import TeamLogo from '../components/TeamLogo'
 import type { PlayerOut } from '../types/api'
 
 function formatDate(iso: string) {
@@ -65,7 +66,10 @@ export default function MatchupPage() {
               <PlayerAvatar src={player.headshot_url} name={player.full_name} size="xl" ringColor={playerTeam?.primary_color} />
               <div>
                 <h2 className="text-2xl font-bold text-ink-primary">{player.full_name}</h2>
-                <p className="mt-1 text-sm text-ink-secondary">{playerTeam?.name ?? player.current_team}</p>
+                <p className="mt-1 flex items-center justify-center gap-1.5 text-sm text-ink-secondary">
+                  {player.current_team && <TeamLogo abbreviation={player.current_team} size="sm" />}
+                  {playerTeam?.name ?? player.current_team}
+                </p>
                 <p className="text-xs text-ink-muted">
                   {player.first_season}–{player.last_season} · {player.games_played} games
                 </p>
@@ -100,15 +104,7 @@ export default function MatchupPage() {
                   : undefined,
               }}
             >
-              <div
-                className="flex h-24 w-24 items-center justify-center rounded-full text-2xl font-bold text-white"
-                style={{
-                  backgroundColor: opponentTeam?.primary_color ?? 'var(--color-surface-2)',
-                  boxShadow: opponentTeam ? `0 0 0 4px ${opponentTeam.secondary_color}55` : undefined,
-                }}
-              >
-                {opponent}
-              </div>
+              <TeamLogo abbreviation={opponent} size="lg" />
               <div>
                 <h2 className="text-2xl font-bold text-ink-primary">{opponentTeam?.name ?? opponent}</h2>
                 {opponentTeam && (

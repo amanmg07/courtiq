@@ -8,6 +8,7 @@ export interface TeamOut {
   division: string
   primary_color: string
   secondary_color: string
+  logo_url: string
 }
 
 export interface PlayerOut {

@@ -10,3 +10,4 @@ class TeamOut(BaseModel):
     division: str
     primary_color: str
     secondary_color: str
+    logo_url: str
