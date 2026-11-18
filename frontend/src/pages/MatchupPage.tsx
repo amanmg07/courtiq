@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Brush } from 'recharts'
 import { api } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
 import { usePersistentState } from '../hooks/usePersistentState'
@@ -157,7 +157,7 @@ export default function MatchupPage() {
           <section>
             <h2 className="mb-3 text-lg font-semibold text-ink-primary">Points, Last {chartData.length} Meetings</h2>
             <div className="rounded-lg border border-border bg-surface-1 p-4">
-              <ResponsiveContainer width="100%" height={240}>
+              <ResponsiveContainer width="100%" height={chartData.length > 15 ? 280 : 240}>
                 <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                   <CartesianGrid stroke="var(--color-grid)" vertical={false} />
                   <XAxis
@@ -172,12 +172,22 @@ export default function MatchupPage() {
                     axisLine={{ stroke: 'var(--color-baseline)' }}
                   />
                   <YAxis stroke="var(--color-baseline)" tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
-                  <Tooltip content={<ChartTooltip />} labelFormatter={(ts) => formatDate(new Date(Number(ts)).toISOString())} />
+                  <Tooltip content={<ChartTooltip dateAxis />} />
                   <Bar dataKey="pts" name="Points" radius={[3, 3, 0, 0]} isAnimationActive={false}>
                     {chartData.map((entry, i) => (
                       <Cell key={i} fill={entry.isHome ? 'var(--color-series-1)' : 'var(--color-series-7)'} />
                     ))}
                   </Bar>
+                  {chartData.length > 15 && (
+                    <Brush
+                      dataKey="date"
+                      height={28}
+                      travellerWidth={10}
+                      tickFormatter={(ts: number) => formatDate(new Date(ts).toISOString())}
+                      stroke="var(--color-series-1)"
+                      fill="var(--color-surface-1)"
+                    />
+                  )}
                 </BarChart>
               </ResponsiveContainer>
               <div className="mt-2 flex gap-4 text-xs text-ink-secondary">

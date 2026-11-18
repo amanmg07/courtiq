@@ -1,5 +1,5 @@
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Brush,
 } from 'recharts'
 import ChartTooltip from './ChartTooltip'
 import type { TrendPoint } from '../types/api'
@@ -34,8 +34,12 @@ export default function TrendChart({ points, statKey, label }: Props) {
     l10: p[`${statKey}_l10_avg` as const],
   }))
 
+  // Below ~15 points a brush adds clutter without adding anything to zoom
+  // into; it earns its space once there's a real range to narrow down.
+  const showBrush = data.length > 15
+
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height={showBrush ? 320 : 280}>
       <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
         <CartesianGrid stroke="var(--color-grid)" vertical={false} />
         <XAxis
@@ -57,11 +61,21 @@ export default function TrendChart({ points, statKey, label }: Props) {
           axisLine={false}
           width={32}
         />
-        <Tooltip content={<ChartTooltip />} labelFormatter={(ts) => formatDate(new Date(Number(ts)).toISOString())} />
+        <Tooltip content={<ChartTooltip dateAxis />} />
         <Legend wrapperStyle={{ fontSize: 12, color: 'var(--color-ink-secondary)' }} />
         <Line type="monotone" dataKey="actual" name={label} stroke={SERIES_COLOR} strokeWidth={2} dot={false} isAnimationActive={false} />
         <Line type="monotone" dataKey="l5" name="Last 5 avg" stroke={L5_COLOR} strokeWidth={2} dot={false} strokeDasharray="4 3" isAnimationActive={false} />
         <Line type="monotone" dataKey="l10" name="Last 10 avg" stroke={L10_COLOR} strokeWidth={2} dot={false} strokeDasharray="1 3" isAnimationActive={false} />
+        {showBrush && (
+          <Brush
+            dataKey="date"
+            height={28}
+            travellerWidth={10}
+            tickFormatter={(ts: number) => formatDate(new Date(ts).toISOString())}
+            stroke="var(--color-series-1)"
+            fill="var(--color-surface-1)"
+          />
+        )}
       </LineChart>
     </ResponsiveContainer>
   )
