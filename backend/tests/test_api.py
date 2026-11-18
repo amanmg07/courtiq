@@ -138,9 +138,39 @@ def test_compare_two_real_players():
     assert len(body["players"]) == 2
 
 
-def test_predict_returns_503_until_models_are_trained():
+def test_predict_returns_real_prediction():
     r = client.post(
         "/api/predict",
         json={"player_id": LEBRON_ID, "opponent_abbr": "DEN", "is_home": True},
     )
-    assert r.status_code == 503
+    assert r.status_code == 200
+    body = r.json()
+    for stat in ("pts", "reb", "ast"):
+        assert 0 <= body[stat]["predicted"] < 60  # sane box-score range, not exact (model-dependent)
+        assert body[stat]["mae"] > 0  # a real measured value, never fabricated/zero
+    assert "model_info" in body and len(body["model_info"]) > 0
+
+
+def test_predict_unknown_player_is_404():
+    r = client.post(
+        "/api/predict",
+        json={"player_id": 999999999, "opponent_abbr": "DEN", "is_home": True},
+    )
+    assert r.status_code == 404
+
+
+def test_predict_handles_low_history_player_without_crashing():
+    """A player with only 1 game played (no L5/L10/season history to speak
+    of) must be imputed, not crash the request."""
+    r = client.get("/api/players/search", params={"q": "Tyrell Terry"})
+    candidates = [p for p in r.json() if p["games_played"] <= 3]
+    if not candidates:
+        pytest.skip("no low-games-played fixture player found in this dataset load")
+    low_history_id = candidates[0]["player_id"]
+
+    r = client.post(
+        "/api/predict",
+        json={"player_id": low_history_id, "opponent_abbr": "BOS", "is_home": False},
+    )
+    assert r.status_code == 200
+    assert r.json()["pts"]["predicted"] >= 0

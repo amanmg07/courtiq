@@ -4,10 +4,12 @@ A full-stack NBA analytics and predictive modeling platform: player search,
 multi-player comparison, opponent matchup analysis, trend exploration, and
 ML-based predictions for points/rebounds/assists.
 
-**Status:** Phase 1 (database + data pipeline), Phase 2 (backend API), and
-Phase 4 (frontend) are complete and tested — done out of order at the user's
-request, so the Predictions page is real UI wired to a real (not yet trained)
-endpoint. ML models are not yet built (see Roadmap).
+**Status:** All four phases complete and tested — database + data pipeline,
+backend API, frontend, and ML models (built in that order except frontend
+and ML, done out of order at the user's request: frontend landed before the
+models existed, with the Predictions page initially showing a real, honest
+"not trained yet" state; `/api/predict` now serves real trained-model
+predictions).
 
 ## Architecture
 
@@ -108,7 +110,7 @@ FastAPI, modular by layer: `app/api/` (routers, HTTP concerns only) →
 | `GET /api/players/{id}/trends?season=&last_n=` | Time series with L5/L10 rolling averages, for charting |
 | `GET /api/players/{id}/matchup/{opponent}?season=` | History vs. one specific opponent, home/away split |
 | `GET /api/compare?player_ids=1,2,3&season=` | Side-by-side averages for 2–6 players |
-| `POST /api/predict` | **Not yet available — returns 503.** Models aren't trained yet (next phase); the request/response contract is final so the frontend can integrate now. |
+| `POST /api/predict` | Predicted pts/reb/ast for a player vs. an opponent, using whichever trained model had the lowest measured test-set MAE per stat. Returns 503 if `scripts/train_models.py` hasn't been run (e.g. a fresh clone). |
 
 Run it:
 ```bash
@@ -153,7 +155,7 @@ app; compared players take categorical slots in selection order.
 | Player Profile | `/players/:id` | Career + season-by-season stats, L5/L10 trend chart with stat tabs |
 | Compare | `/compare` | 2–6 players side-by-side, career or one season, bar chart + table |
 | Matchup | `/matchup` | A player's history vs. one opponent, home/away split, game log |
-| Predictions | `/predict` | Real UI wired to the real `/api/predict` endpoint — shows its honest 503 ("not trained yet") alongside real L10/season/matchup context pulled from other endpoints |
+| Predictions | `/predict` | Predicted pts/reb/ast (with each model's measured MAE) alongside real L10/season/matchup context |
 
 Structure: `src/api/client.ts` (typed fetch wrapper) → `src/hooks/useFetch.ts`
 (loading/error state) → `src/pages/*` (one per route) → `src/components/*`
@@ -263,8 +265,58 @@ change or to pick up newly played games in the current season.
   `fgm > fga` (or 3P/FT equivalents), zero negative stats, zero nulls in the
   raw source — checked across all 134,960 source rows before load.
 
-## Roadmap (not yet built)
+## Machine learning
 
-- [x] FastAPI routes: players, search, game logs, season averages, compare, matchup, trends
-- [ ] ML training pipeline: Linear/Multiple Regression + Random Forest for pts/reb/ast, time-based train/test split, MAE/RMSE/R² evaluation, then wire `predict_service.py` + `/api/predict` to it
-- [x] React frontend: dashboard, player search, comparison, matchup analysis, predictions (built ahead of ML at the user's request; Predictions page shows real context + an honest "not trained yet" state)
+`scripts/train_models.py` trains **3 model types × 3 targets** (pts/reb/ast)
+= 9 models, using the same leakage-safe features already in
+`player_game_features`. For each target, the model with the lowest test-set
+MAE is saved to `ml/models/{target}_model.joblib` and served by
+`/api/predict`.
+
+**Time-based split (never random):** train on seasons 2021-22..2024-25
+(103,766 rows), test on 2025-26..2026-27 (31,194 rows) — every test-set game
+is chronologically after every training-set game, verified by an assertion
+in the script itself and a dedicated test (`test_train_test_seasons_do_not_overlap`).
+
+**Real, measured results** (not fabricated — see `ml/models/metrics.json`
+after running the script, and the regenerable plots in `docs/ml_plots/`):
+
+| Target | linear (L10 only) | multiple linear | random forest | **best** |
+|---|---|---|---|---|
+| PTS | MAE 4.728, R² 0.496 | MAE 4.622, R² 0.514 | MAE 4.615, R² 0.519 | **random_forest** |
+| REB | MAE 1.949, R² 0.408 | MAE 1.904, R² 0.431 | MAE 1.909, R² 0.431 | **linear_multi** |
+| AST | MAE 1.380, R² 0.467 | MAE 1.348, R² 0.489 | MAE 1.359, R² 0.487 | **linear_multi** |
+
+The full feature set beats the single-feature baseline on every target
+(small but consistent gains); Random Forest only wins for points, where
+`pts_l10_avg` (60%) and `pts_season_avg` (25%) dominate its feature
+importances — see `docs/ml_plots/pts_feature_importance.png`. An R² in the
+0.4–0.5 range is in line with what's realistic for single-game NBA box-score
+prediction from rolling averages alone: game-to-game variance is inherently
+high (blowouts, foul trouble, injuries mid-game), and this is being
+evaluated on its hardest case, not cherry-picked.
+
+![Actual vs. predicted, on the held-out test set](docs/ml_plots/actual_vs_predicted.png)
+![Random Forest feature importances for the points model](docs/ml_plots/pts_feature_importance.png)
+
+**Live inference** (`backend/app/services/predict_service.py`) recomputes
+the same feature set anchored to "right now" instead of a past game — i.e.
+including the player's most recent game in their L5/L10/season averages,
+for a next game that hasn't been played yet. Missing history (e.g. a
+rookie's first few games) is median-imputed by the same `SimpleImputer`
+fit during training, so a low-history player gets a reasonable prediction
+instead of a crash (tested in `test_predict_handles_low_history_player_without_crashing`).
+
+Run it:
+```bash
+PYTHONPATH=backend .venv/bin/python scripts/train_models.py   # trains + saves models + metrics.json
+PYTHONPATH=backend .venv/bin/python ml/evaluation/plots.py     # regenerates docs/ml_plots/*.png
+```
+(`ml/models/*.joblib` are gitignored — regenerate them after cloning, before
+`/api/predict` will return 200 instead of 503. `metrics.json` is committed.)
+
+## Possible extensions (beyond the original spec)
+
+- Deeper history: the original Kaggle source (`eoinamoore/historical-nba-data-and-player-box-scores`) goes back to 1946; wiring it in needs a Kaggle API key
+- Model tuning (grid search, gradient boosting) and additional features (back-to-backs, travel distance, injury reports)
+- Auth/multi-user support, saved comparisons, a `/teams/:abbr` page

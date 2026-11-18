@@ -1,7 +1,7 @@
 import type {
   TeamOut, PlayerListResponse, PlayerOut, PlayerDetail, GameLogResponse,
   SeasonAveragesResponse, TrendsResponse, MatchupResponse, ComparisonResponse,
-  LeadersResponse,
+  LeadersResponse, PredictionResponse,
 } from '../types/api'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api'
@@ -73,5 +73,5 @@ export const api = {
     request<LeadersResponse>('/leaders', { stat, ...opts }),
 
   predict: (playerId: number, opponentAbbr: string, isHome: boolean) =>
-    post<unknown>('/predict', { player_id: playerId, opponent_abbr: opponentAbbr, is_home: isHome }),
+    post<PredictionResponse>('/predict', { player_id: playerId, opponent_abbr: opponentAbbr, is_home: isHome }),
 }

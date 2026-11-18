@@ -164,6 +164,23 @@ export interface LeadersResponse {
   leaders: LeaderEntry[]
 }
 
+export interface StatPrediction {
+  predicted: number
+  recent_avg_l10: number | null
+  season_avg: number | null
+  mae: number
+}
+
+export interface PredictionResponse {
+  player_id: number
+  opponent_abbr: string
+  is_home: boolean
+  pts: StatPrediction
+  reb: StatPrediction
+  ast: StatPrediction
+  model_info: string
+}
+
 export interface ApiError {
   detail: string
 }

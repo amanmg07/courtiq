@@ -5,9 +5,30 @@ import { LoadingState, ErrorState, EmptyState } from '../components/StatusStates
 import PlayerAutocomplete from '../components/PlayerAutocomplete'
 import TeamSelect from '../components/TeamSelect'
 import StatCard from '../components/StatCard'
-import type { PlayerOut } from '../types/api'
+import type { PlayerOut, PredictionResponse, StatPrediction } from '../types/api'
 
-type PredictCallState = { status: 'idle' } | { status: 'loading' } | { status: 'unavailable'; message: string }
+type PredictCallState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'unavailable'; message: string }
+  | { status: 'result'; data: PredictionResponse }
+
+const STAT_META: { key: 'pts' | 'reb' | 'ast'; label: string; accent: 'series-1' | 'series-2' | 'series-3' }[] = [
+  { key: 'pts', label: 'Points', accent: 'series-1' },
+  { key: 'reb', label: 'Rebounds', accent: 'series-2' },
+  { key: 'ast', label: 'Assists', accent: 'series-3' },
+]
+
+function PredictionCard({ label, stat, accent }: { label: string; stat: StatPrediction; accent: 'series-1' | 'series-2' | 'series-3' }) {
+  return (
+    <StatCard
+      label={label}
+      value={stat.predicted.toFixed(1)}
+      sublabel={`± ${stat.mae.toFixed(1)} MAE (measured)`}
+      accent={accent}
+    />
+  )
+}
 
 export default function PredictPage() {
   const [player, setPlayer] = useState<PlayerOut | null>(null)
@@ -15,7 +36,8 @@ export default function PredictPage() {
   const [isHome, setIsHome] = useState(true)
   const [predictState, setPredictState] = useState<PredictCallState>({ status: 'idle' })
 
-  // Real historical context, available today, regardless of the ML model's status.
+  // Real historical context, shown alongside the prediction (and still useful
+  // on its own if the prediction call fails for any reason).
   const seasonAvg = useFetch(() => (player ? api.seasonAverages(player.player_id) : null), [player?.player_id])
   const trend = useFetch(() => (player ? api.trends(player.player_id, { last_n: 10 }) : null), [player?.player_id])
   const matchup = useFetch(
@@ -27,8 +49,8 @@ export default function PredictPage() {
     if (!player || !opponent) return
     setPredictState({ status: 'loading' })
     try {
-      await api.predict(player.player_id, opponent, isHome)
-      setPredictState({ status: 'idle' }) // unreachable until a model exists
+      const data = await api.predict(player.player_id, opponent, isHome)
+      setPredictState({ status: 'result', data })
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Prediction service unavailable'
       setPredictState({ status: 'unavailable', message })
@@ -53,7 +75,13 @@ export default function PredictPage() {
           {player ? (
             <div className="flex items-center justify-between rounded-md border border-border bg-surface-1 px-3 py-2 text-sm">
               <span>{player.full_name}</span>
-              <button onClick={() => setPlayer(null)} className="text-ink-muted hover:text-critical">
+              <button
+                onClick={() => {
+                  setPlayer(null)
+                  setPredictState({ status: 'idle' })
+                }}
+                className="text-ink-muted hover:text-critical"
+              >
                 ×
               </button>
             </div>
@@ -63,7 +91,14 @@ export default function PredictPage() {
         </div>
         <div>
           <label className="mb-1 block text-xs text-ink-muted">Opponent</label>
-          <TeamSelect value={opponent} onChange={setOpponent} excludeAbbr={player?.current_team ?? undefined} />
+          <TeamSelect
+            value={opponent}
+            onChange={(v) => {
+              setOpponent(v)
+              setPredictState({ status: 'idle' })
+            }}
+            excludeAbbr={player?.current_team ?? undefined}
+          />
         </div>
         <div>
           <label className="mb-1 block text-xs text-ink-muted">Location</label>
@@ -99,12 +134,25 @@ export default function PredictPage() {
           {predictState.status === 'unavailable' && (
             <div className="rounded-lg border border-warning/40 bg-surface-1 p-4">
               <p className="text-sm font-medium text-warning">Predictions aren't available yet</p>
-              <p className="mt-1 text-sm text-ink-secondary">
-                The ML training pipeline (regression + random forest models for points, rebounds, and assists)
-                hasn't been built yet — this is the next phase of the project. The historical context below is
-                real, live data in the meantime.
-              </p>
+              <p className="mt-1 text-sm text-ink-secondary">{predictState.message}</p>
             </div>
+          )}
+
+          {predictState.status === 'result' && (
+            <section>
+              <h2 className="mb-3 text-lg font-semibold text-ink-primary">
+                Predicted vs. {predictState.data.opponent_abbr} ({predictState.data.is_home ? 'Home' : 'Away'})
+              </h2>
+              <div className="grid grid-cols-3 gap-3">
+                {STAT_META.map((m) => (
+                  <PredictionCard key={m.key} label={m.label} stat={predictState.data[m.key]} accent={m.accent} />
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-ink-muted">
+                {predictState.data.model_info}. MAE is the model's measured average error on a real, time-based
+                held-out test set — not a confidence score, but a concrete "typically off by about this much."
+              </p>
+            </section>
           )}
 
           <section>
