@@ -148,11 +148,31 @@ def _get_live_features(db: Session, player_id: int, opponent_abbr: str, is_home:
         select(func.max(PlayerGameStat.game_date)).where(PlayerGameStat.player_id == player_id)
     )
     days_rest = (datetime.date.today() - last_game_date).days - 1 if last_game_date else None
+    is_back_to_back = days_rest == 0
+
+    # home_stand_streak "as of now": how many of the player's most recent
+    # CONSECUTIVE games already share the requested game's is_home value,
+    # counting backward from their last played game and stopping at the
+    # first mismatch -- the live-inference analog of the leakage-safe
+    # training feature (see scripts/build_features.py's identical definition).
+    recent_locations = db.execute(
+        select(PlayerGameStat.is_home)
+        .where(PlayerGameStat.player_id == player_id)
+        .order_by(PlayerGameStat.game_date.desc())
+        .limit(20)
+    ).scalars().all()
+    home_stand_streak = 0
+    for loc in recent_locations:
+        if loc != is_home:
+            break
+        home_stand_streak += 1
 
     return {
         "games_played_career_to_date": player.games_played,
         "days_rest": days_rest,
         "is_home": int(is_home),
+        "is_back_to_back": int(is_back_to_back),
+        "home_stand_streak": home_stand_streak,
         "pts_l5_avg": mean_or_none(last5, "pts"), "reb_l5_avg": mean_or_none(last5, "reb"),
         "ast_l5_avg": mean_or_none(last5, "ast"), "min_l5_avg": mean_or_none(last5, "minutes"),
         "pts_l10_avg": mean_or_none(last10, "pts"), "reb_l10_avg": mean_or_none(last10, "reb"),

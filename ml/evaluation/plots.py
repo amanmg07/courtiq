@@ -19,7 +19,7 @@ import pandas as pd
 import seaborn as sns
 
 from app.db.session import engine
-from ml.common import FEATURE_COLUMNS, TARGETS, TEST_SEASONS, MODELS_DIR_NAME
+from ml.common import FEATURE_COLUMNS, BOOLEAN_FEATURE_COLUMNS, TARGETS, TEST_SEASONS, MODELS_DIR_NAME
 
 MODELS_DIR = PROJECT_ROOT / MODELS_DIR_NAME
 PLOTS_DIR = PROJECT_ROOT / "docs" / "ml_plots"
@@ -33,16 +33,18 @@ SERIES_COLOR = "#3987e5"
 
 
 def load_test_data() -> pd.DataFrame:
-    cols = ", ".join(f"f.{c}" for c in FEATURE_COLUMNS if c != "is_home")
+    bool_cols = ", ".join(f"f.{c}" for c in BOOLEAN_FEATURE_COLUMNS)
+    non_bool_cols = ", ".join(f"f.{c}" for c in FEATURE_COLUMNS if c not in BOOLEAN_FEATURE_COLUMNS)
     query = f"""
-        SELECT s.season, s.pts, s.reb, s.ast, f.is_home, {cols}
+        SELECT s.season, s.pts, s.reb, s.ast, {bool_cols}, {non_bool_cols}
         FROM player_game_stats s
         JOIN player_game_features f ON s.game_id = f.game_id AND s.player_id = f.player_id
         WHERE s.season = ANY(%(seasons)s)
     """
     with engine.connect() as conn:
         df = pd.read_sql(query, conn, params={"seasons": TEST_SEASONS})
-    df["is_home"] = df["is_home"].astype(int)
+    for c in BOOLEAN_FEATURE_COLUMNS:
+        df[c] = df[c].astype(int)
     return df
 
 
@@ -69,10 +71,16 @@ def main():
     plt.close(fig)
     print(f"saved {PLOTS_DIR / 'actual_vs_predicted.png'}")
 
-    rf_bundle = joblib.load(MODELS_DIR / "pts_model.joblib")
-    if rf_bundle["model_type"] == "random_forest":
-        rf = rf_bundle["pipeline"].named_steps["reg"]
-        importances = pd.Series(rf.feature_importances_, index=rf_bundle["features"]).sort_values()
+    # Random Forest feature importances are computed for every target during
+    # training (see scripts/train_models.py), independent of whether RF
+    # happens to be the WINNING model for that target -- so read them from
+    # metrics.json rather than assuming the saved pts_model.joblib is an RF.
+    import json
+    with open(MODELS_DIR / "metrics.json") as f:
+        metrics = json.load(f)
+    pts_importances = metrics.get("feature_importances_random_forest", {}).get("pts")
+    if pts_importances:
+        importances = pd.Series(pts_importances).sort_values()
         fig, ax = plt.subplots(figsize=(8, 7))
         importances.plot.barh(ax=ax, color=SERIES_COLOR)
         ax.set_xlabel("Feature importance")

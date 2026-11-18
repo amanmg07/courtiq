@@ -119,7 +119,7 @@ PYTHONPATH=. uvicorn app.main:app --reload --port 8000
 # interactive docs: http://localhost:8000/docs
 ```
 
-Tests (18, integration-style against the real dev DB — this is a data app,
+Tests (25, integration-style against the real dev DB — this is a data app,
 so the SQL itself is what needs covering):
 ```bash
 python -m pytest   # from project root; pytest.ini points at backend/tests
@@ -267,34 +267,52 @@ change or to pick up newly played games in the current season.
 
 ## Machine learning
 
-`scripts/train_models.py` trains **3 model types × 3 targets** (pts/reb/ast)
-= 9 models, using the same leakage-safe features already in
-`player_game_features`. For each target, the model with the lowest test-set
-MAE is saved to `ml/models/{target}_model.joblib` and served by
-`/api/predict`.
+`scripts/train_models.py` trains **4 model types × 3 targets** (pts/reb/ast)
+= 12 models, using the leakage-safe features in `player_game_features`
+(including two schedule-fatigue features, `is_back_to_back` and
+`home_stand_streak`, added in a later pass — see below). For each target,
+the model with the lowest test-set MAE is saved to
+`ml/models/{target}_model.joblib` and served by `/api/predict`.
 
 **Time-based split (never random):** train on seasons 2021-22..2024-25
 (103,766 rows), test on 2025-26..2026-27 (31,194 rows) — every test-set game
 is chronologically after every training-set game, verified by an assertion
 in the script itself and a dedicated test (`test_train_test_seasons_do_not_overlap`).
+Random Forest and Gradient Boosting are **hyperparameter-tuned**
+(`RandomizedSearchCV`, 8 candidates × 3 folds) using `TimeSeriesSplit` — a
+time-respecting cross-validation on the training set only, so even *model
+selection* never peeks at a chronologically later game; the real held-out
+test set is touched exactly once, for final reporting.
 
 **Real, measured results** (not fabricated — see `ml/models/metrics.json`
-after running the script, and the regenerable plots in `docs/ml_plots/`):
+after running the script, and the regenerable plots in `docs/ml_plots/`).
+Gradient Boosting is [XGBoost](https://xgboost.readthedocs.io/) when its
+native library loads (macOS needs `brew install libomp` first — one-time,
+~30s), else sklearn's `HistGradientBoostingRegressor` automatically, logged
+either way in `metrics.json`'s `boosting_implementation` field:
 
-| Target | linear (L10 only) | multiple linear | random forest | **best** |
-|---|---|---|---|---|
-| PTS | MAE 4.728, R² 0.496 | MAE 4.622, R² 0.514 | MAE 4.615, R² 0.519 | **random_forest** |
-| REB | MAE 1.949, R² 0.408 | MAE 1.904, R² 0.431 | MAE 1.909, R² 0.431 | **linear_multi** |
-| AST | MAE 1.380, R² 0.467 | MAE 1.348, R² 0.489 | MAE 1.359, R² 0.487 | **linear_multi** |
+| Target | linear (L10 only) | multiple linear | random forest (tuned) | gradient boosting (tuned) | **best** |
+|---|---|---|---|---|---|
+| PTS | MAE 4.728, R² 0.496 | MAE 4.619, R² 0.515 | MAE 4.606, R² 0.520 | MAE 4.588, R² 0.522 | **gradient_boosting** |
+| REB | MAE 1.949, R² 0.408 | MAE 1.903, R² 0.432 | MAE 1.900, R² 0.435 | MAE 1.897, R² 0.435 | **gradient_boosting** |
+| AST | MAE 1.380, R² 0.467 | MAE 1.347, R² 0.489 | MAE 1.350, R² 0.490 | MAE 1.344, R² 0.492 | **gradient_boosting** |
 
-The full feature set beats the single-feature baseline on every target
-(small but consistent gains); Random Forest only wins for points, where
-`pts_l10_avg` (60%) and `pts_season_avg` (25%) dominate its feature
-importances — see `docs/ml_plots/pts_feature_importance.png`. An R² in the
-0.4–0.5 range is in line with what's realistic for single-game NBA box-score
-prediction from rolling averages alone: game-to-game variance is inherently
-high (blowouts, foul trouble, injuries mid-game), and this is being
-evaluated on its hardest case, not cherry-picked.
+Every richer model beats the single-feature baseline, and tuned Gradient
+Boosting (XGBoost) now wins on all three targets. Reported honestly: the
+gains are **real but modest** (points MAE 4.615 → 4.588 from the original
+Phase 3 Random Forest) — most of it came from the better algorithm and
+tuning, not the two new schedule-fatigue features, whose individual feature
+importance is near zero (see `docs/ml_plots/pts_feature_importance.png` —
+`is_back_to_back` and `home_stand_streak` sit at the very bottom). That's an
+honest, expected result discussed with the user before building this pass:
+rolling scoring averages dominate because they already implicitly capture
+most of what matters; the features most likely to meaningfully move this
+further (injury/lineup status, Vegas lines) require a paid sports-data API,
+which was explicitly deferred — see "Possible extensions" below. An R² in
+the 0.4–0.5 range is in line with what's realistic for single-game NBA
+box-score prediction from rolling averages alone: game-to-game variance is
+inherently high (blowouts, foul trouble, injuries mid-game), and this is
+being evaluated on its hardest case, not cherry-picked.
 
 ![Actual vs. predicted, on the held-out test set](docs/ml_plots/actual_vs_predicted.png)
 ![Random Forest feature importances for the points model](docs/ml_plots/pts_feature_importance.png)
@@ -309,7 +327,11 @@ instead of a crash (tested in `test_predict_handles_low_history_player_without_c
 
 Run it:
 ```bash
-PYTHONPATH=backend .venv/bin/python scripts/train_models.py   # trains + saves models + metrics.json
+# macOS only, one-time, for the real XGBoost (optional -- falls back to
+# sklearn's HistGradientBoostingRegressor automatically if skipped):
+brew install libomp
+
+PYTHONPATH=backend .venv/bin/python scripts/train_models.py   # trains + saves models + metrics.json (~5-10 min, mostly hyperparameter search)
 PYTHONPATH=backend .venv/bin/python ml/evaluation/plots.py     # regenerates docs/ml_plots/*.png
 ```
 (`ml/models/*.joblib` are gitignored — regenerate them after cloning, before
@@ -318,5 +340,5 @@ PYTHONPATH=backend .venv/bin/python ml/evaluation/plots.py     # regenerates doc
 ## Possible extensions (beyond the original spec)
 
 - Deeper history: the original Kaggle source (`eoinamoore/historical-nba-data-and-player-box-scores`) goes back to 1946; wiring it in needs a Kaggle API key
-- Model tuning (grid search, gradient boosting) and additional features (back-to-backs, travel distance, injury reports)
+- **Injury/lineup status and Vegas betting lines** — discussed directly with the user as the realistic way to meaningfully beat the current MAE (box-score history alone can't see "their best teammate is out tonight"); both need a paid sports-data API and were explicitly deferred in favor of the free improvements above
 - Auth/multi-user support, saved comparisons, a `/teams/:abbr` page

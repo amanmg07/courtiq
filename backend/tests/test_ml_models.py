@@ -34,10 +34,17 @@ def test_train_test_seasons_do_not_overlap():
     assert max(TRAIN_SEASONS) < min(TEST_SEASONS)
 
 
+def test_schedule_fatigue_features_are_included(metrics):
+    """The free-improvements pass added is_back_to_back/home_stand_streak --
+    confirm they actually made it into what the models were trained on."""
+    assert "is_back_to_back" in metrics["feature_columns"]
+    assert "home_stand_streak" in metrics["feature_columns"]
+
+
 def test_metrics_cover_every_target_and_model_type(metrics):
     for target in TARGETS:
         assert target in metrics["results"]
-        for model_type in ("linear_single", "linear_multi", "random_forest"):
+        for model_type in ("linear_single", "linear_multi", "random_forest", "gradient_boosting"):
             m = metrics["results"][target][model_type]
             assert m["mae"] > 0
             assert m["rmse"] >= m["mae"]  # RMSE >= MAE always holds mathematically

@@ -166,3 +166,12 @@ class PlayerGameFeature(Base):
     matchup_reb_avg: Mapped[float | None] = mapped_column(Float, nullable=True)
     matchup_ast_avg: Mapped[float | None] = mapped_column(Float, nullable=True)
     matchup_games_played: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # schedule-fatigue features, added for the free-improvements ML pass:
+    # back-to-back is a well-known real fatigue effect (no leakage -- the
+    # upcoming game's date/is_home are schedule facts known ahead of time,
+    # same as days_rest above; only the game's own OUTCOME is off-limits).
+    is_back_to_back: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # consecutive prior games sharing this game's is_home value (0 = this
+    # breaks the pattern, e.g. first game of a new road trip or homestand)
+    home_stand_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

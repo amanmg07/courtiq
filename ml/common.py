@@ -12,6 +12,7 @@ FEATURE_COLUMNS = [
     "games_played_career_to_date",
     "days_rest",
     "is_home",
+    "is_back_to_back", "home_stand_streak",
     "pts_l5_avg", "reb_l5_avg", "ast_l5_avg", "min_l5_avg",
     "pts_l10_avg", "reb_l10_avg", "ast_l10_avg", "min_l10_avg",
     "pts_season_avg", "reb_season_avg", "ast_season_avg", "min_season_avg",
@@ -19,6 +20,11 @@ FEATURE_COLUMNS = [
     "opp_pts_allowed_avg", "opp_reb_allowed_avg", "opp_ast_allowed_avg",
     "matchup_pts_avg", "matchup_reb_avg", "matchup_ast_avg", "matchup_games_played",
 ]
+
+# Columns that are booleans in Postgres and need an explicit int cast after
+# pd.read_sql (sklearn wants numeric, not Python bool objects in a mixed
+# dtype frame going through SimpleImputer/StandardScaler).
+BOOLEAN_FEATURE_COLUMNS = ["is_home", "is_back_to_back"]
 
 TARGETS = ["pts", "reb", "ast"]
 

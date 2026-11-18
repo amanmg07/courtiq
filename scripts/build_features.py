@@ -3,7 +3,8 @@ CourtIQ feature engineering pipeline.
 
 Reads player_game_stats from Postgres and computes PlayerGameFeature rows:
 rolling L5/L10 averages, season-to-date averages, home/away splits, an
-opponent defensive proxy, and historical matchup averages.
+opponent defensive proxy, historical matchup averages, and two
+schedule-fatigue features (is_back_to_back, home_stand_streak).
 
 LEAKAGE RULE: every *_avg / *_allowed_avg / matchup_* value for a given row is
 computed using ONLY games with an earlier game_date (ties broken by game_id)
@@ -49,6 +50,18 @@ def build_player_features(df: pd.DataFrame) -> pd.DataFrame:
 
     out["games_played_career_to_date"] = g.cumcount()
     out["days_rest"] = g["game_date"].diff().dt.days - 1
+    out["is_back_to_back"] = out["days_rest"].fillna(99) == 0
+
+    # home_stand_streak: consecutive PRIOR games sharing this game's is_home
+    # value (0 if this game breaks the pattern). Leakage-safe: is_home for
+    # the game being predicted is a schedule fact known ahead of time (same
+    # status as days_rest above) -- only the game's own stat OUTCOME is
+    # off-limits, and this uses none of that.
+    # Trick: within each (player, contiguous same-is_home block), cumcount()
+    # already equals "how many earlier games in this streak" since it's
+    # 0-indexed -- no explicit shift needed.
+    block_id = g["is_home"].transform(lambda s: (s != s.shift()).cumsum())
+    out["home_stand_streak"] = df.groupby([df["player_id"], block_id], group_keys=False).cumcount()
 
     for stat, col in [("pts", "pts"), ("reb", "reb"), ("ast", "ast"), ("minutes", "min")]:
         out[f"{col}_l5_avg"] = g[stat].apply(lambda s: shifted_rolling_mean(s, 5))
