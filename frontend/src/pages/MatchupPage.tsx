@@ -201,7 +201,11 @@ export default function MatchupPage() {
                     />
                     <YAxis stroke="var(--color-baseline)" tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
                     <Tooltip content={<ChartTooltip dateAxis />} />
-                    <Bar dataKey="pts" name="Points" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                    {/* barSize fixed explicitly: Recharts infers bar width from
+                        category count on a numeric x-axis, which badly misjudges
+                        when only 1-2 meetings are in view while zoomed (bars either
+                        shrink to a sliver or overflow past the plot edges). */}
+                    <Bar dataKey="pts" name="Points" radius={[3, 3, 0, 0]} isAnimationActive={false} barSize={28}>
                       {visibleChartData.map((entry, i) => (
                         <Cell key={i} fill={entry.isHome ? 'var(--color-series-1)' : 'var(--color-series-7)'} />
                       ))}

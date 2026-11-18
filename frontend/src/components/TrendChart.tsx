@@ -44,11 +44,15 @@ export default function TrendChart({ points, statKey, label }: Props) {
 
   const dates = useMemo(() => data.map((d) => d.date), [data])
 
-  const { containerRef, zoom, setZoom, panBy, fullDomain } = useWheelZoom(dates, points, {
-    yAxisWidth: Y_AXIS_WIDTH,
-    marginLeft: MARGIN.left,
-    marginRight: MARGIN.right,
-  })
+  // minVisiblePoints=2: the line is drawn with dot={false}, so a window
+  // that shrinks to a single point would render nothing at all -- the
+  // chart going fully blank, not just tight.
+  const { containerRef, zoom, setZoom, panBy, fullDomain } = useWheelZoom(
+    dates,
+    points,
+    { yAxisWidth: Y_AXIS_WIDTH, marginLeft: MARGIN.left, marginRight: MARGIN.right },
+    2,
+  )
 
   const visibleData = zoom ? data.filter((d) => d.date >= zoom[0] && d.date <= zoom[1]) : data
 
