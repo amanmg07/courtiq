@@ -8,10 +8,12 @@ import PlayerAvatar from '../components/PlayerAvatar'
 import TeamBadge from '../components/TeamBadge'
 import type { LeaderEntry } from '../types/api'
 
-const LEADER_STATS: { key: 'pts' | 'reb' | 'ast'; label: string; accent: string; suffix: string }[] = [
+const LEADER_STATS: { key: 'pts' | 'reb' | 'ast' | 'stl' | 'blk'; label: string; accent: string; suffix: string }[] = [
   { key: 'pts', label: 'Points', accent: 'var(--color-series-1)', suffix: 'PPG' },
   { key: 'reb', label: 'Rebounds', accent: 'var(--color-series-2)', suffix: 'RPG' },
   { key: 'ast', label: 'Assists', accent: 'var(--color-series-3)', suffix: 'APG' },
+  { key: 'stl', label: 'Steals', accent: 'var(--color-series-4)', suffix: 'SPG' },
+  { key: 'blk', label: 'Blocks', accent: 'var(--color-series-7)', suffix: 'BPG' },
 ]
 
 function LeaderBoard({ title, accent, leaders, suffix }: { title: string; accent: string; leaders: LeaderEntry[]; suffix: string }) {
@@ -68,25 +70,9 @@ export default function DashboardPage() {
   const season = data?.[0]?.season
 
   return (
-    <div className="space-y-8">
-      <section className="rounded-xl border border-border bg-surface-1 p-6">
-        <p className="text-sm font-medium uppercase tracking-wide text-series-1">NBA Analytics</p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight text-ink-primary">
-          Explore players. Compare matchups. Spot trends.
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-ink-secondary">
-          CourtIQ tracks {season ? `the ${season} season` : 'every loaded season'} across 1,000+ players and
-          130K+ game logs. Search for a player to see their full history, or jump into a head-to-head comparison.
-        </p>
-        <div className="mt-4 max-w-md">
-          <PlayerAutocomplete
-            placeholder="Search for a player…"
-            onSelect={(p) => navigate(`/players/${p.player_id}`)}
-          />
-        </div>
-      </section>
-
-      <section>
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+      {/* Left: every leaderboard, stacked in one scrollable column */}
+      <section className="lg:sticky lg:top-20">
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="text-lg font-semibold text-ink-primary">League Leaders</h2>
           {season && <span className="text-sm text-ink-muted">{season} season</span>}
@@ -94,12 +80,51 @@ export default function DashboardPage() {
         {loading && <LoadingState label="Loading league leaders…" />}
         {error && <ErrorState message={error} />}
         {data && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-4 lg:max-h-[calc(100vh-180px)] lg:overflow-y-auto lg:pr-1">
             {boards.map((b, i) => (
               <LeaderBoard key={b.key} title={`${b.label} per Game`} accent={b.accent} leaders={data[i].leaders} suffix={b.suffix} />
             ))}
           </div>
         )}
+      </section>
+
+      {/* Right: one big, prominent player search */}
+      <section className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface-1 p-10 text-center lg:min-h-[calc(100vh-180px)]">
+        <p className="text-sm font-medium uppercase tracking-wide text-series-1">NBA Analytics</p>
+        <h1 className="mt-2 max-w-md text-4xl font-bold tracking-tight text-ink-primary">
+          Explore players. Compare matchups. Spot trends.
+        </h1>
+        <p className="mt-3 max-w-md text-sm text-ink-secondary">
+          CourtIQ tracks {season ? `the ${season} season` : 'every loaded season'} across 1,000+ players and
+          130K+ game logs.
+        </p>
+        <div className="mt-8 w-full max-w-lg">
+          <PlayerAutocomplete
+            placeholder="Search for a player…"
+            onSelect={(p) => navigate(`/players/${p.player_id}`)}
+            inputClassName="px-5 py-4 text-lg"
+          />
+        </div>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm">
+          <button
+            onClick={() => navigate('/players')}
+            className="rounded-full border border-border px-4 py-2 text-ink-secondary transition-colors hover:border-series-1 hover:text-ink-primary"
+          >
+            Browse all players
+          </button>
+          <button
+            onClick={() => navigate('/compare')}
+            className="rounded-full border border-border px-4 py-2 text-ink-secondary transition-colors hover:border-series-1 hover:text-ink-primary"
+          >
+            Compare players
+          </button>
+          <button
+            onClick={() => navigate('/predict')}
+            className="rounded-full border border-border px-4 py-2 text-ink-secondary transition-colors hover:border-series-1 hover:text-ink-primary"
+          >
+            Generate a prediction
+          </button>
+        </div>
       </section>
     </div>
   )

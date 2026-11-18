@@ -8,6 +8,10 @@ interface Props {
   onSelect: (player: PlayerOut) => void
   placeholder?: string
   excludeIds?: number[]
+  /** Extra classes merged onto the <input>, e.g. to make it bigger as a page's
+   * hero search (see DashboardPage). Appended after the base classes, so a
+   * sizing/padding utility here wins over the default px-3 py-2 text-sm. */
+  inputClassName?: string
 }
 
 // Module-level constant, NOT a `= []` default parameter: a default parameter
@@ -19,7 +23,12 @@ interface Props {
 // console-error check across every page; see frontend/screenshot.mjs).
 const NO_EXCLUSIONS: number[] = []
 
-export default function PlayerAutocomplete({ onSelect, placeholder = 'Search players…', excludeIds = NO_EXCLUSIONS }: Props) {
+export default function PlayerAutocomplete({
+  onSelect,
+  placeholder = 'Search players…',
+  excludeIds = NO_EXCLUSIONS,
+  inputClassName = '',
+}: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<PlayerOut[]>([])
   const [open, setOpen] = useState(false)
@@ -61,7 +70,7 @@ export default function PlayerAutocomplete({ onSelect, placeholder = 'Search pla
         }}
         onFocus={() => setOpen(true)}
         placeholder={placeholder}
-        className="w-full rounded-md border border-border bg-surface-1 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-series-1"
+        className={`w-full rounded-md border border-border bg-surface-1 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-series-1 ${inputClassName}`}
       />
       {open && visibleResults.length > 0 && (
         <ul className="absolute z-30 mt-1 w-full overflow-hidden rounded-md border border-border bg-surface-2 shadow-lg">
