@@ -25,6 +25,10 @@ await withPage(async (page) => {
   await selectPlayer(page, 'LeBron James')
   await page.locator('select').selectOption('DEN')
   await page.waitForTimeout(1000)
+  // Belt-and-suspenders against a screenshot-capture race (seen before: DOM/
+  // computed styles are correct at this point, but the compositor hasn't
+  // necessarily painted the latest SVG frame yet) -- force a paint flush.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   await page.screenshot({ path: 'screenshots/07-matchup-filled.png', fullPage: true })
   console.log('captured matchup-filled')
 })

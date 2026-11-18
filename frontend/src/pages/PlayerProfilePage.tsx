@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
 import { useTeam } from '../hooks/useTeams'
@@ -21,6 +21,7 @@ function pct(v: number | null): string {
 
 export default function PlayerProfilePage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const playerId = Number(id)
   const [statTab, setStatTab] = useState<'pts' | 'reb' | 'ast'>('pts')
   const [lastN, setLastN] = useState(30)
@@ -39,9 +40,12 @@ export default function PlayerProfilePage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/players" className="text-sm text-ink-muted hover:text-ink-primary">
-          ← All players
-        </Link>
+        <button
+          onClick={() => navigate(-1)}
+          className="text-sm text-ink-muted hover:text-ink-primary"
+        >
+          ← Back
+        </button>
         <div
           className="mt-2 overflow-hidden rounded-xl border border-border p-5"
           style={{

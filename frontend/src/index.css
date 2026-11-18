@@ -1,32 +1,37 @@
 @import "tailwindcss";
 
 /*
- * CourtIQ design tokens. Dark is the only theme (a deliberate product choice
- * for a sports-analytics dashboard, not a default awaiting a light mode).
- * Values come from the dataviz skill's validated reference palette --
- * categorical slots keep a fixed assignment per stat/player so color always
- * follows the entity, never its rank (series-1=pts, series-2=reb, series-3=ast
- * throughout the app; comparison players take slots in selection order).
+ * CourtIQ design tokens -- light theme, blue-monochrome (explicit user
+ * request: white background, blue for everything, black-ish text; the one
+ * deliberate exception is TeamBadge, which keeps each team's real brand
+ * color -- see components/TeamBadge.tsx).
+ *
+ * Where a single chart needs to tell 2+ series apart (trend lines,
+ * comparison bars, home/away bars), series-1..8 below are different
+ * LIGHTNESS STEPS of the same blue hue (the dataviz skill's validated
+ * sequential-blue ramp), not different hues -- distinguishable without
+ * breaking the "everything is blue" rule. series-1 doubles as the primary
+ * UI accent (buttons, links, nav, logo).
  */
 @theme {
-  --color-page: #0d0d0d;
-  --color-surface-1: #1a1a19;
-  --color-surface-2: #222221;
-  --color-ink-primary: #ffffff;
-  --color-ink-secondary: #c3c2b7;
+  --color-page: #f9f9f7;
+  --color-surface-1: #fcfcfb;
+  --color-surface-2: #eef4fc; /* light blue tint, for hover/active backgrounds */
+  --color-ink-primary: #0b0b0b;
+  --color-ink-secondary: #52514e;
   --color-ink-muted: #898781;
-  --color-grid: #2c2c2a;
-  --color-baseline: #383835;
-  --color-border: rgba(255, 255, 255, 0.1);
+  --color-grid: #e1e0d9;
+  --color-baseline: #c3c2b7;
+  --color-border: rgba(11, 11, 11, 0.1);
 
-  --color-series-1: #3987e5; /* blue    - points */
-  --color-series-2: #d95926; /* orange  - rebounds */
-  --color-series-3: #199e70; /* aqua    - assists */
-  --color-series-4: #c98500; /* yellow */
-  --color-series-5: #d55181; /* magenta */
-  --color-series-6: #2e8b2e; /* green */
-  --color-series-7: #9085e9; /* violet */
-  --color-series-8: #e66767; /* red */
+  --color-series-1: #2a78d6; /* primary blue -- the accent color everywhere */
+  --color-series-2: #5598e7;
+  --color-series-3: #184f95;
+  --color-series-4: #86b6ef;
+  --color-series-5: #104281;
+  --color-series-6: #6da7ec;
+  --color-series-7: #1c5cab;
+  --color-series-8: #9ec5f4;
 
   --color-good: #0ca30c;
   --color-warning: #fab219;
@@ -48,14 +53,13 @@ body {
 }
 
 ::selection {
-  background-color: color-mix(in srgb, var(--color-series-1) 35%, transparent);
+  background-color: color-mix(in srgb, var(--color-series-1) 25%, transparent);
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 
-/* thin, recessive scrollbar to match the terminal-like density of the UI */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
