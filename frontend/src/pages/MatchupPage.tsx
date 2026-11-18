@@ -2,13 +2,13 @@ import { useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { api } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
+import { useTeam } from '../hooks/useTeams'
 import { LoadingState, ErrorState, EmptyState } from '../components/StatusStates'
 import PlayerAutocomplete from '../components/PlayerAutocomplete'
 import TeamSelect from '../components/TeamSelect'
 import StatCard from '../components/StatCard'
 import ChartTooltip from '../components/ChartTooltip'
 import PlayerAvatar from '../components/PlayerAvatar'
-import TeamBadge from '../components/TeamBadge'
 import type { PlayerOut } from '../types/api'
 
 function formatDate(iso: string) {
@@ -18,6 +18,8 @@ function formatDate(iso: string) {
 export default function MatchupPage() {
   const [player, setPlayer] = useState<PlayerOut | null>(null)
   const [opponent, setOpponent] = useState('')
+  const opponentTeam = useTeam(opponent)
+  const playerTeam = useTeam(player?.current_team)
 
   const { data, loading, error } = useFetch(
     () => (player && opponent ? api.matchup(player.player_id, opponent) : null),
@@ -39,30 +41,94 @@ export default function MatchupPage() {
         <p className="mt-1 text-sm text-ink-secondary">See how a player has historically performed against one opponent.</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 sm:max-w-xl">
-        <div>
-          <label className="mb-1 block text-xs text-ink-muted">Player</label>
-          {player ? (
-            <div className="flex items-center justify-between rounded-md border border-border bg-surface-1 px-3 py-2 text-sm">
-              <span className="flex items-center gap-2.5">
-                <PlayerAvatar src={player.headshot_url} name={player.full_name} size="sm" />
-                {player.full_name}
-                <TeamBadge abbreviation={player.current_team} />
-              </span>
-              <button onClick={() => setPlayer(null)} className="text-ink-muted hover:text-critical">
-                ×
-              </button>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Left: pick + display the player */}
+        <div className="flex min-h-[280px] flex-col rounded-xl border border-border bg-surface-1 p-5">
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-ink-muted">Player</p>
+          {!player ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+              <div className="h-16 w-16 rounded-full border-2 border-dashed border-border" />
+              <div className="w-full max-w-xs">
+                <PlayerAutocomplete onSelect={setPlayer} />
+              </div>
+              <p className="text-xs text-ink-muted">Search for a player to analyze.</p>
             </div>
           ) : (
-            <PlayerAutocomplete onSelect={setPlayer} />
+            <div
+              className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg p-4 text-center"
+              style={{
+                background: playerTeam
+                  ? `linear-gradient(160deg, ${playerTeam.primary_color}26 0%, transparent 70%)`
+                  : undefined,
+              }}
+            >
+              <PlayerAvatar src={player.headshot_url} name={player.full_name} size="xl" ringColor={playerTeam?.primary_color} />
+              <div>
+                <h2 className="text-2xl font-bold text-ink-primary">{player.full_name}</h2>
+                <p className="mt-1 text-sm text-ink-secondary">{playerTeam?.name ?? player.current_team}</p>
+                <p className="text-xs text-ink-muted">
+                  {player.first_season}–{player.last_season} · {player.games_played} games
+                </p>
+              </div>
+              <button
+                onClick={() => setPlayer(null)}
+                className="text-xs font-medium text-series-1 hover:underline"
+              >
+                Change player
+              </button>
+            </div>
           )}
         </div>
-        <div>
-          <label className="mb-1 block text-xs text-ink-muted">Opponent</label>
-          <TeamSelect value={opponent} onChange={setOpponent} excludeAbbr={player?.current_team ?? undefined} />
+
+        {/* Right: pick + display the opponent team */}
+        <div className="flex min-h-[280px] flex-col rounded-xl border border-border bg-surface-1 p-5">
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-ink-muted">Opponent</p>
+          {!opponent ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+              <div className="h-16 w-16 rounded-full border-2 border-dashed border-border" />
+              <div className="w-full max-w-xs">
+                <TeamSelect value={opponent} onChange={setOpponent} excludeAbbr={player?.current_team ?? undefined} />
+              </div>
+              <p className="text-xs text-ink-muted">Pick the opponent team.</p>
+            </div>
+          ) : (
+            <div
+              className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg p-4 text-center"
+              style={{
+                background: opponentTeam
+                  ? `linear-gradient(160deg, ${opponentTeam.primary_color}26 0%, transparent 70%)`
+                  : undefined,
+              }}
+            >
+              <div
+                className="flex h-24 w-24 items-center justify-center rounded-full text-2xl font-bold text-white"
+                style={{
+                  backgroundColor: opponentTeam?.primary_color ?? 'var(--color-surface-2)',
+                  boxShadow: opponentTeam ? `0 0 0 4px ${opponentTeam.secondary_color}55` : undefined,
+                }}
+              >
+                {opponent}
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-ink-primary">{opponentTeam?.name ?? opponent}</h2>
+                {opponentTeam && (
+                  <p className="mt-1 text-sm text-ink-secondary">
+                    {opponentTeam.conference}ern Conference · {opponentTeam.division} Division
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setOpponent('')}
+                className="text-xs font-medium text-series-1 hover:underline"
+              >
+                Change opponent
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Bottom: the analysis, once both are picked */}
       {!player || !opponent ? (
         <EmptyState message="Select a player and an opponent to see their matchup history." />
       ) : loading ? (
