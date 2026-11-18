@@ -147,6 +147,28 @@ export function useWheelZoom(
         // (fixed-scale) chart mostly blank -- hold at the current window
         // instead of shrinking into near-emptiness.
         if (zoomingIn && countInRange(newMin, newMax) < effectiveMinVisible) return prev
+        if (zoomingIn) {
+          // The cursor-centered shrink can legitimately produce a window
+          // that's still valid (>= minVisiblePoints) but where those points
+          // only occupy a small fraction of it -- e.g. the cursor landed
+          // near a sparser stretch, so the nearest enough points to satisfy
+          // the count are spread out relative to the window. Left alone,
+          // that renders as a short line/cluster of bars surrounded by a
+          // lot of visibly blank chart, which reads as "part of the chart
+          // disappeared." Snap the window in around the actual points
+          // whenever they fill less than half of it, with some padding --
+          // this only ever tightens what was asked for, never loosens it.
+          const inRange = points.filter((t) => t >= newMin && t <= newMax)
+          const dataMin = Math.min(...inRange)
+          const dataMax = Math.max(...inRange)
+          const dataSpan = dataMax - dataMin
+          const windowSpan = newMax - newMin
+          if (dataSpan > 0 && dataSpan / windowSpan < 0.5) {
+            const pad = Math.max(dataSpan * 0.15, technicalFloorSpan / 4)
+            newMin = Math.max(fullMin, dataMin - pad)
+            newMax = Math.min(fullMax, dataMax + pad)
+          }
+        }
         if (newMin <= fullMin && newMax >= fullMax) return null
         return [newMin, newMax]
       })
@@ -154,7 +176,7 @@ export function useWheelZoom(
 
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [fullMin, fullMax, countInRange, effectiveMinVisible, insets.marginLeft, insets.marginRight, insets.yAxisWidth])
+  }, [points, fullMin, fullMax, countInRange, effectiveMinVisible, insets.marginLeft, insets.marginRight, insets.yAxisWidth])
 
   return { containerRef, zoom, setZoom, panBy, fullDomain }
 }
