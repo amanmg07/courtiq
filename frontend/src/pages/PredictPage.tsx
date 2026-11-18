@@ -86,7 +86,7 @@ export default function PredictPage() {
   // prediction for the player's actual next games instead of hand-picking
   // an opponent. CourtIQ's own DB has no future games by design (it's built
   // from box scores, which don't exist until a game is played).
-  const upcoming = useFetch(() => (player ? api.upcomingGames(player.player_id, 5) : null), [player?.player_id])
+  const upcoming = useFetch(() => (player ? api.upcomingGames(player.player_id, 6) : null), [player?.player_id])
 
   async function runPrediction(targetOpponent: string, targetIsHome: boolean) {
     if (!player || !targetOpponent) return
@@ -180,9 +180,9 @@ export default function PredictPage() {
           <p className="mb-3 text-xs font-medium uppercase tracking-wide text-ink-muted">Opponent</p>
 
           {hasUpcoming && !opponent && (
-            <div className="mb-4">
+            <div className="mb-4 flex flex-col items-center text-center">
               <p className="mb-2 text-xs text-ink-muted">{player!.full_name}'s next games — tap to predict</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {upcoming.data!.games.map((g) => (
                   <button
                     key={g.game_date}
