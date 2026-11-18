@@ -1,8 +1,10 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Brush } from 'recharts'
+import { useMemo } from 'react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { api } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
 import { usePersistentState } from '../hooks/usePersistentState'
 import { useTeam } from '../hooks/useTeams'
+import { useWheelZoom } from '../hooks/useWheelZoom'
 import { LoadingState, ErrorState, EmptyState } from '../components/StatusStates'
 import PlayerAutocomplete from '../components/PlayerAutocomplete'
 import TeamSelect from '../components/TeamSelect'
@@ -32,13 +34,33 @@ export default function MatchupPage() {
   // the real gap between them -- misleading here specifically, since meetings
   // against one opponent are naturally clustered (teams play 2-4x/season)
   // with irregular gaps between clusters, including the off-season.
-  const chartData = data
-    ? [...data.recent_games].reverse().map((g) => ({
-        date: new Date(g.game_date).getTime(),
-        pts: g.pts,
-        isHome: g.is_home,
-      }))
-    : []
+  const chartData = useMemo(
+    () =>
+      data
+        ? [...data.recent_games].reverse().map((g) => ({
+            date: new Date(g.game_date).getTime(),
+            pts: g.pts,
+            isHome: g.is_home,
+          }))
+        : [],
+    [data],
+  )
+
+  const chartFullDomain = useMemo<[number, number]>(() => {
+    if (chartData.length === 0) return [0, 1]
+    const dates = chartData.map((d) => d.date)
+    return [Math.min(...dates), Math.max(...dates)]
+  }, [chartData])
+
+  const { containerRef: chartRef, zoom: chartZoom, setZoom: setChartZoom } = useWheelZoom(
+    chartFullDomain,
+    data,
+    { yAxisWidth: 28, marginLeft: 0, marginRight: 16 },
+  )
+
+  const visibleChartData = chartZoom
+    ? chartData.filter((d) => d.date >= chartZoom[0] && d.date <= chartZoom[1])
+    : chartData
 
   return (
     <div className="space-y-6">
@@ -157,46 +179,49 @@ export default function MatchupPage() {
           <section>
             <h2 className="mb-3 text-lg font-semibold text-ink-primary">Points, Last {chartData.length} Meetings</h2>
             <div className="rounded-lg border border-border bg-surface-1 p-4">
-              <ResponsiveContainer width="100%" height={chartData.length > 15 ? 280 : 240}>
-                <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid stroke="var(--color-grid)" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    type="number"
-                    scale="time"
-                    domain={['dataMin', 'dataMax']}
-                    tickFormatter={(ts: number) => formatDate(new Date(ts).toISOString())}
-                    stroke="var(--color-baseline)"
-                    tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }}
-                    tickLine={false}
-                    axisLine={{ stroke: 'var(--color-baseline)' }}
-                  />
-                  <YAxis stroke="var(--color-baseline)" tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
-                  <Tooltip content={<ChartTooltip dateAxis />} />
-                  <Bar dataKey="pts" name="Points" radius={[3, 3, 0, 0]} isAnimationActive={false}>
-                    {chartData.map((entry, i) => (
-                      <Cell key={i} fill={entry.isHome ? 'var(--color-series-1)' : 'var(--color-series-7)'} />
-                    ))}
-                  </Bar>
-                  {chartData.length > 15 && (
-                    <Brush
+              <div ref={chartRef}>
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={visibleChartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid stroke="var(--color-grid)" vertical={false} />
+                    <XAxis
                       dataKey="date"
-                      height={28}
-                      travellerWidth={10}
+                      type="number"
+                      scale="time"
+                      domain={chartZoom ?? ['dataMin', 'dataMax']}
+                      allowDataOverflow
                       tickFormatter={(ts: number) => formatDate(new Date(ts).toISOString())}
-                      stroke="var(--color-series-1)"
-                      fill="var(--color-surface-1)"
+                      stroke="var(--color-baseline)"
+                      tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={{ stroke: 'var(--color-baseline)' }}
                     />
+                    <YAxis stroke="var(--color-baseline)" tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
+                    <Tooltip content={<ChartTooltip dateAxis />} />
+                    <Bar dataKey="pts" name="Points" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                      {visibleChartData.map((entry, i) => (
+                        <Cell key={i} fill={entry.isHome ? 'var(--color-series-1)' : 'var(--color-series-7)'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs text-ink-secondary">
+                <div className="flex gap-4">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: 'var(--color-series-1)' }} /> Home
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: 'var(--color-series-7)' }} /> Away
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-ink-muted">
+                  <span className="text-[11px]">Scroll or pinch to zoom</span>
+                  {chartZoom && (
+                    <button onClick={() => setChartZoom(null)} className="text-[11px] font-medium text-series-1 hover:underline">
+                      Reset zoom
+                    </button>
                   )}
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="mt-2 flex gap-4 text-xs text-ink-secondary">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: 'var(--color-series-1)' }} /> Home
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: 'var(--color-series-7)' }} /> Away
-                </span>
+                </div>
               </div>
             </div>
           </section>
