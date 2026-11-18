@@ -57,12 +57,6 @@ export default function MatchupPage() {
     fullDomain: chartFullDomain,
   } = useWheelZoom(chartDates, data, { yAxisWidth: 28, marginLeft: 0, marginRight: 16 })
 
-  // Axis domain comes from whichever points fall inside the zoom/pan window
-  // (dataMin/dataMax), not the raw window itself -- otherwise a window that
-  // doesn't line up with an actual meeting leaves dead blank space at the
-  // edge instead of the chart filling edge-to-edge. useWheelZoom already
-  // keeps the window from ever landing on a stretch with zero meetings, so
-  // this filter is never empty while zoomed.
   const visibleChartData = chartZoom
     ? chartData.filter((d) => d.date >= chartZoom[0] && d.date <= chartZoom[1])
     : chartData
@@ -192,7 +186,13 @@ export default function MatchupPage() {
                       dataKey="date"
                       type="number"
                       scale="time"
-                      domain={['dataMin', 'dataMax']}
+                      // Fixed to the zoom window's own bounds, not the
+                      // min/max of whichever meetings fall inside it --
+                      // otherwise panning across sparse/unevenly-spaced
+                      // meetings would visibly change the scale even
+                      // though the zoom level itself never changes.
+                      domain={chartZoom ?? ['dataMin', 'dataMax']}
+                      allowDataOverflow
                       tickFormatter={(ts: number) => formatDate(new Date(ts).toISOString())}
                       stroke="var(--color-baseline)"
                       tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }}

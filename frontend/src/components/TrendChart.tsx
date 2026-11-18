@@ -50,13 +50,6 @@ export default function TrendChart({ points, statKey, label }: Props) {
     marginRight: MARGIN.right,
   })
 
-  // The zoom/pan window is a math range; what's actually rendered is
-  // whichever real points fall inside it. The axis domain comes from THOSE
-  // points (dataMin/dataMax), not the raw window -- otherwise a window that
-  // doesn't line up with an actual point leaves dead blank space at the
-  // edge instead of the chart filling edge-to-edge. useWheelZoom already
-  // keeps the window from ever landing on a stretch with zero games (an
-  // off-season gap), so this filter is never empty while zoomed.
   const visibleData = zoom ? data.filter((d) => d.date >= zoom[0] && d.date <= zoom[1]) : data
 
   return (
@@ -68,7 +61,14 @@ export default function TrendChart({ points, statKey, label }: Props) {
             dataKey="date"
             type="number"
             scale="time"
-            domain={['dataMin', 'dataMax']}
+            // The axis domain is the zoom window's own fixed bounds, not
+            // the min/max of whichever points happen to fall inside it --
+            // otherwise, as you pan across sparse/unevenly-spaced games,
+            // the included point set shifts and the apparent scale would
+            // visibly stretch and shrink even though the window's span
+            // (the actual zoom level) never changes.
+            domain={zoom ?? ['dataMin', 'dataMax']}
+            allowDataOverflow
             tickFormatter={(ts: number) => formatDate(ts)}
             stroke="var(--color-baseline)"
             tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }}
