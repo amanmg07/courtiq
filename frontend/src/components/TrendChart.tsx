@@ -41,18 +41,21 @@ export default function TrendChart({ points, statKey, label }: Props) {
     [points, statKey],
   )
 
-  const fullDomain = useMemo<[number, number]>(() => {
-    if (data.length === 0) return [0, 1]
-    const dates = data.map((d) => d.date)
-    return [Math.min(...dates), Math.max(...dates)]
-  }, [data])
+  const dates = useMemo(() => data.map((d) => d.date), [data])
 
-  const { containerRef, zoom, setZoom } = useWheelZoom(fullDomain, points, {
+  const { containerRef, zoom, setZoom } = useWheelZoom(dates, points, {
     yAxisWidth: Y_AXIS_WIDTH,
     marginLeft: MARGIN.left,
     marginRight: MARGIN.right,
   })
 
+  // The zoom/pan window is a math range; what's actually rendered is
+  // whichever real points fall inside it. The axis domain comes from THOSE
+  // points (dataMin/dataMax), not the raw window -- otherwise a window that
+  // doesn't line up with an actual point leaves dead blank space at the
+  // edge instead of the chart filling edge-to-edge. useWheelZoom already
+  // keeps the window from ever landing on a stretch with zero games (an
+  // off-season gap), so this filter is never empty while zoomed.
   const visibleData = zoom ? data.filter((d) => d.date >= zoom[0] && d.date <= zoom[1]) : data
 
   return (
@@ -64,8 +67,7 @@ export default function TrendChart({ points, statKey, label }: Props) {
             dataKey="date"
             type="number"
             scale="time"
-            domain={zoom ?? ['dataMin', 'dataMax']}
-            allowDataOverflow
+            domain={['dataMin', 'dataMax']}
             tickFormatter={(ts: number) => formatDate(ts)}
             stroke="var(--color-baseline)"
             tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }}
