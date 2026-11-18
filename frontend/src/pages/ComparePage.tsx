@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { api } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
+import { usePersistentState } from '../hooks/usePersistentState'
 import { LoadingState, ErrorState } from '../components/StatusStates'
 import PlayerAutocomplete from '../components/PlayerAutocomplete'
 import ComparisonBarChart from '../components/ComparisonBarChart'
@@ -18,8 +19,8 @@ function pct(v: number | null): string {
 }
 
 export default function ComparePage() {
-  const [selected, setSelected] = useState<PlayerOut[]>([])
-  const [season, setSeason] = useState<string>('')
+  const [selected, setSelected] = usePersistentState<PlayerOut[]>('courtiq:compare:selected', [])
+  const [season, setSeason] = usePersistentState<string>('courtiq:compare:season', '')
 
   // memoized: a fresh array every render would flow into PlayerAutocomplete's
   // excludeIds prop and needlessly retrigger its search effect (see the fix

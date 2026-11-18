@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { api } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
+import { usePersistentState } from '../hooks/usePersistentState'
 import { useTeam } from '../hooks/useTeams'
 import { LoadingState, ErrorState, EmptyState } from '../components/StatusStates'
 import PlayerAutocomplete from '../components/PlayerAutocomplete'
@@ -17,8 +17,8 @@ function formatDate(iso: string) {
 }
 
 export default function MatchupPage() {
-  const [player, setPlayer] = useState<PlayerOut | null>(null)
-  const [opponent, setOpponent] = useState('')
+  const [player, setPlayer] = usePersistentState<PlayerOut | null>('courtiq:matchup:player', null)
+  const [opponent, setOpponent] = usePersistentState('courtiq:matchup:opponent', '')
   const opponentTeam = useTeam(opponent)
   const playerTeam = useTeam(player?.current_team)
 

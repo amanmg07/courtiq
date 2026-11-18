@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect } from 'react'
 import { api, ApiRequestError } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
+import { usePersistentState } from '../hooks/usePersistentState'
 import { LoadingState, ErrorState, EmptyState } from '../components/StatusStates'
 import PlayerAutocomplete from '../components/PlayerAutocomplete'
 import TeamSelect from '../components/TeamSelect'
@@ -37,10 +38,18 @@ function formatShortcutDate(iso: string) {
 }
 
 export default function PredictPage() {
-  const [player, setPlayer] = useState<PlayerOut | null>(null)
-  const [opponent, setOpponent] = useState('')
-  const [isHome, setIsHome] = useState(true)
-  const [predictState, setPredictState] = useState<PredictCallState>({ status: 'idle' })
+  const [player, setPlayer] = usePersistentState<PlayerOut | null>('courtiq:predict:player', null)
+  const [opponent, setOpponent] = usePersistentState('courtiq:predict:opponent', '')
+  const [isHome, setIsHome] = usePersistentState('courtiq:predict:isHome', true)
+  const [predictState, setPredictState] = usePersistentState<PredictCallState>('courtiq:predict:result', { status: 'idle' })
+
+  // A persisted "loading" status means the request was abandoned when the
+  // page unmounted mid-fetch (no promise survives a remount) -- without
+  // this it would restore as stuck on "Generating..." forever.
+  useEffect(() => {
+    if (predictState.status === 'loading') setPredictState({ status: 'idle' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Real historical context, shown alongside the prediction (and still useful
   // on its own if the prediction call fails for any reason).

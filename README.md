@@ -122,7 +122,7 @@ PYTHONPATH=. uvicorn app.main:app --reload --port 8000
 # interactive docs: http://localhost:8000/docs
 ```
 
-Tests (25, integration-style against the real dev DB — this is a data app,
+Tests (31, integration-style against the real dev DB — this is a data app,
 so the SQL itself is what needs covering):
 ```bash
 python -m pytest   # from project root; pytest.ini points at backend/tests
@@ -144,22 +144,27 @@ again.
 
 ## Frontend
 
-React 19 + TypeScript + Tailwind v4 + Recharts, built with Vite. Dark theme
-only (a deliberate product choice, not a default awaiting a light mode) —
-tokens come from the `dataviz` skill's validated reference palette, so
-chart/series colors are colorblind-safe by construction rather than picked by
-eye. `pts`/`reb`/`ast` keep a fixed color (blue/orange/aqua) everywhere in the
-app; compared players take categorical slots in selection order. Team identity
-(real brand colors + headshots, added in the feedback pass below) layers on
-top of that system rather than replacing it.
+React 19 + TypeScript + Tailwind v4 + Recharts, built with Vite. Light theme,
+blue-monochrome (flipped from an initial dark/colorblind-safe-categorical
+theme after direct feedback — see "User feedback pass" below): white/near-
+white background, blue for every line/chart/accent, near-black text. Team
+badges and logos are the one deliberate exception, keeping each team's real
+brand color. Where a chart must still tell 2+ series apart (trend lines,
+comparison bars, home/away bars), series colors are different *lightness
+steps* of the same blue rather than different hues.
+
+Every page with meaningful input state (search, selected players, chosen
+opponent, season, stat tab) persists it to `sessionStorage` via
+`usePersistentState` — navigating to another tab and back restores exactly
+where you left off, including mid-filled forms, within the same browser tab.
 
 | Page | Route | What it does |
 |---|---|---|
-| Dashboard | `/` | True league leaders (pts/reb/ast, no games floor) for the latest season, player search |
+| Dashboard | `/` | All 5 league-leader categories (pts/reb/ast/stl/blk, no games floor) stacked in one scrollable column, big player search |
 | Players | `/players` | Browse (paginated) or search the full player database, with headshots + team badges |
 | Player Profile | `/players/:id` | Team-colored header with headshot, career + season-by-season stats, L5/L10 trend chart with stat tabs |
-| Compare | `/compare` | 2–6 players side-by-side, career or one season, bar chart + table |
-| Matchup | `/matchup` | A player's history vs. one opponent, home/away split, game log |
+| Compare | `/compare` | 2–6 players side-by-side; the chart/table are always visible and fill in as each player is added (no "add 2 players" gate) |
+| Matchup | `/matchup` | Dedicated left (player) / right (opponent, with real team logo) panels; full analysis renders below once both are picked |
 | Predictions | `/predict` | Shortcuts to the player's actual next games (real schedule, one tap to predict), predicted pts/reb/ast with measured MAE, plus real L10/season/matchup context |
 
 Structure: `src/api/client.ts` (typed fetch wrapper) → `src/hooks/useFetch.ts`

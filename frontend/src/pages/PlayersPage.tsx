@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
+import { usePersistentState } from '../hooks/usePersistentState'
 import { LoadingState, ErrorState, EmptyState } from '../components/StatusStates'
 import PlayerAvatar from '../components/PlayerAvatar'
 import TeamBadge from '../components/TeamBadge'
@@ -11,8 +11,8 @@ const PAGE_SIZE = 25
 
 export default function PlayersPage() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(0)
+  const [search, setSearch] = usePersistentState('courtiq:players:search', '')
+  const [page, setPage] = usePersistentState('courtiq:players:page', 0)
 
   const browseResult = useFetch(
     () => (search.trim() ? null : api.players(PAGE_SIZE, page * PAGE_SIZE)),

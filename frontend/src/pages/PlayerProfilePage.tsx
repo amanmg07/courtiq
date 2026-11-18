@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
+import { usePersistentState } from '../hooks/usePersistentState'
 import { useTeam } from '../hooks/useTeams'
 import { LoadingState, ErrorState } from '../components/StatusStates'
 import StatCard from '../components/StatCard'
@@ -23,8 +23,8 @@ export default function PlayerProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const playerId = Number(id)
-  const [statTab, setStatTab] = useState<'pts' | 'reb' | 'ast'>('pts')
-  const [lastN, setLastN] = useState(30)
+  const [statTab, setStatTab] = usePersistentState<'pts' | 'reb' | 'ast'>('courtiq:playerProfile:statTab', 'pts')
+  const [lastN, setLastN] = usePersistentState('courtiq:playerProfile:lastN', 30)
 
   const detail = useFetch(() => api.playerDetail(playerId), [playerId])
   const seasons = useFetch(() => api.seasonAverages(playerId), [playerId])
