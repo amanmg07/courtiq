@@ -2,7 +2,7 @@ interface StatCardProps {
   label: string
   value: string
   sublabel?: string
-  accent?: 'series-1' | 'series-2' | 'series-3' | 'series-4'
+  accent?: 'series-1' | 'series-2' | 'series-3' | 'series-4' | 'series-5'
 }
 
 const ACCENT_BORDER: Record<string, string> = {
@@ -10,6 +10,7 @@ const ACCENT_BORDER: Record<string, string> = {
   'series-2': 'before:bg-series-2',
   'series-3': 'before:bg-series-3',
   'series-4': 'before:bg-series-4',
+  'series-5': 'before:bg-series-5',
 }
 
 export default function StatCard({ label, value, sublabel, accent = 'series-1' }: StatCardProps) {

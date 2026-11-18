@@ -32,6 +32,8 @@ export interface PlayerDetail extends PlayerOut {
   career_avg_pts: number | null
   career_avg_reb: number | null
   career_avg_ast: number | null
+  career_avg_stl: number | null
+  career_avg_blk: number | null
   career_avg_minutes: number | null
   career_fg_pct: number | null
   career_fg3_pct: number | null
@@ -104,6 +106,8 @@ export interface TrendPoint {
   pts: number
   reb: number
   ast: number
+  stl: number
+  blk: number
   fg_pct: number | null
   fg3_pct: number | null
   ft_pct: number | null
@@ -129,6 +133,8 @@ export interface MatchupGame {
   pts: number
   reb: number
   ast: number
+  stl: number
+  blk: number
   fg_pct: number | null
 }
 
@@ -139,6 +145,8 @@ export interface MatchupResponse {
   avg_pts: number | null
   avg_reb: number | null
   avg_ast: number | null
+  avg_stl: number | null
+  avg_blk: number | null
   avg_minutes: number | null
   fg_pct: number | null
   home_avg_pts: number | null

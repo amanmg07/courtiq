@@ -69,11 +69,13 @@ export default function PlayerProfilePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="PPG (career)" value={p.career_avg_pts?.toFixed(1) ?? '—'} accent="series-1" />
         <StatCard label="RPG (career)" value={p.career_avg_reb?.toFixed(1) ?? '—'} accent="series-2" />
         <StatCard label="APG (career)" value={p.career_avg_ast?.toFixed(1) ?? '—'} accent="series-3" />
-        <StatCard label="MPG (career)" value={p.career_avg_minutes?.toFixed(1) ?? '—'} accent="series-4" />
+        <StatCard label="SPG (career)" value={p.career_avg_stl?.toFixed(1) ?? '—'} accent="series-4" />
+        <StatCard label="BPG (career)" value={p.career_avg_blk?.toFixed(1) ?? '—'} accent="series-5" />
+        <StatCard label="MPG (career)" value={p.career_avg_minutes?.toFixed(1) ?? '—'} />
       </div>
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="FG%" value={pct(p.career_fg_pct)} />
@@ -132,6 +134,8 @@ export default function PlayerProfilePage() {
                   <th className="px-4 py-3 text-right">PTS</th>
                   <th className="px-4 py-3 text-right">REB</th>
                   <th className="px-4 py-3 text-right">AST</th>
+                  <th className="px-4 py-3 text-right">STL</th>
+                  <th className="px-4 py-3 text-right">BLK</th>
                   <th className="px-4 py-3 text-right">FG%</th>
                   <th className="px-4 py-3 text-right">3P%</th>
                   <th className="px-4 py-3 text-right">FT%</th>
@@ -146,6 +150,8 @@ export default function PlayerProfilePage() {
                     <td className="tabular px-4 py-2.5 text-right text-ink-primary">{s.avg_pts.toFixed(1)}</td>
                     <td className="tabular px-4 py-2.5 text-right text-ink-primary">{s.avg_reb.toFixed(1)}</td>
                     <td className="tabular px-4 py-2.5 text-right text-ink-primary">{s.avg_ast.toFixed(1)}</td>
+                    <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{s.avg_stl.toFixed(1)}</td>
+                    <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{s.avg_blk.toFixed(1)}</td>
                     <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{pct(s.fg_pct)}</td>
                     <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{pct(s.fg3_pct)}</td>
                     <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{pct(s.ft_pct)}</td>
@@ -158,6 +164,8 @@ export default function PlayerProfilePage() {
                   <td className="tabular px-4 py-2.5 text-right text-ink-primary">{seasons.data.career.avg_pts.toFixed(1)}</td>
                   <td className="tabular px-4 py-2.5 text-right text-ink-primary">{seasons.data.career.avg_reb.toFixed(1)}</td>
                   <td className="tabular px-4 py-2.5 text-right text-ink-primary">{seasons.data.career.avg_ast.toFixed(1)}</td>
+                  <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{seasons.data.career.avg_stl.toFixed(1)}</td>
+                  <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{seasons.data.career.avg_blk.toFixed(1)}</td>
                   <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{pct(seasons.data.career.fg_pct)}</td>
                   <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{pct(seasons.data.career.fg3_pct)}</td>
                   <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{pct(seasons.data.career.ft_pct)}</td>

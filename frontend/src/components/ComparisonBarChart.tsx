@@ -11,6 +11,8 @@ const METRICS: { key: keyof ComparisonEntry['stats']; label: string }[] = [
   { key: 'avg_pts', label: 'PTS' },
   { key: 'avg_reb', label: 'REB' },
   { key: 'avg_ast', label: 'AST' },
+  { key: 'avg_stl', label: 'STL' },
+  { key: 'avg_blk', label: 'BLK' },
 ]
 
 export default function ComparisonBarChart({ players }: { players: ComparisonEntry[] }) {

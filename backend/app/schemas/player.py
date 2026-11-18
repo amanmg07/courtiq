@@ -30,6 +30,8 @@ class PlayerDetail(PlayerOut):
     career_avg_pts: float | None
     career_avg_reb: float | None
     career_avg_ast: float | None
+    career_avg_stl: float | None
+    career_avg_blk: float | None
     career_avg_minutes: float | None
     career_fg_pct: float | None
     career_fg3_pct: float | None

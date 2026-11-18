@@ -135,11 +135,13 @@ export default function MatchupPage() {
         <EmptyState message={`${player.full_name} hasn't played against ${opponent} in the loaded seasons.`} />
       ) : data ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <StatCard label={`PPG vs ${opponent}`} value={data.avg_pts?.toFixed(1) ?? '—'} sublabel={`${data.games_played} games`} accent="series-1" />
             <StatCard label="RPG" value={data.avg_reb?.toFixed(1) ?? '—'} accent="series-2" />
             <StatCard label="APG" value={data.avg_ast?.toFixed(1) ?? '—'} accent="series-3" />
-            <StatCard label="FG%" value={data.fg_pct ? `${(data.fg_pct * 100).toFixed(1)}%` : '—'} accent="series-4" />
+            <StatCard label="SPG" value={data.avg_stl?.toFixed(1) ?? '—'} accent="series-4" />
+            <StatCard label="BPG" value={data.avg_blk?.toFixed(1) ?? '—'} accent="series-5" />
+            <StatCard label="FG%" value={data.fg_pct ? `${(data.fg_pct * 100).toFixed(1)}%` : '—'} />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 sm:max-w-md">
@@ -187,6 +189,8 @@ export default function MatchupPage() {
                     <th className="px-4 py-3 text-right">PTS</th>
                     <th className="px-4 py-3 text-right">REB</th>
                     <th className="px-4 py-3 text-right">AST</th>
+                    <th className="px-4 py-3 text-right">STL</th>
+                    <th className="px-4 py-3 text-right">BLK</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -199,6 +203,8 @@ export default function MatchupPage() {
                       <td className="tabular px-4 py-2.5 text-right text-ink-primary">{g.pts}</td>
                       <td className="tabular px-4 py-2.5 text-right text-ink-primary">{g.reb}</td>
                       <td className="tabular px-4 py-2.5 text-right text-ink-primary">{g.ast}</td>
+                      <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{g.stl}</td>
+                      <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{g.blk}</td>
                     </tr>
                   ))}
                 </tbody>

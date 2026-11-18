@@ -82,6 +82,8 @@ class TrendPoint(BaseModel):
     pts: int
     reb: int
     ast: int
+    stl: int
+    blk: int
     fg_pct: float | None
     fg3_pct: float | None
     ft_pct: float | None
@@ -109,6 +111,8 @@ class MatchupGame(BaseModel):
     pts: int
     reb: int
     ast: int
+    stl: int
+    blk: int
     fg_pct: float | None
 
 
@@ -119,6 +123,8 @@ class MatchupResponse(BaseModel):
     avg_pts: float | None
     avg_reb: float | None
     avg_ast: float | None
+    avg_stl: float | None
+    avg_blk: float | None
     avg_minutes: float | None
     fg_pct: float | None
     home_avg_pts: float | None

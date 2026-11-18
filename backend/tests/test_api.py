@@ -125,6 +125,7 @@ def test_trends_no_leakage_on_first_game_of_dataset():
     first_game = min(points, key=lambda p: p["game_date"])
     if first_game["game_date"] == "2021-10-19":  # true first game of the dataset
         assert first_game["pts_l5_avg"] is None
+    assert "stl" in points[0] and "blk" in points[0]
 
 
 def test_matchup_vs_opponent():
@@ -133,6 +134,10 @@ def test_matchup_vs_opponent():
     body = r.json()
     assert body["games_played"] > 0
     assert body["avg_pts"] is not None
+    # all 5 core stats must be present everywhere a player's stats are shown
+    assert body["avg_stl"] is not None
+    assert body["avg_blk"] is not None
+    assert "stl" in body["recent_games"][0] and "blk" in body["recent_games"][0]
 
 
 def test_matchup_unknown_opponent_is_empty_not_error():

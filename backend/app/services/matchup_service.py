@@ -20,6 +20,8 @@ def get_matchup(db: Session, player_id: int, opponent_abbr: str, season: str | N
         func.avg(PlayerGameStat.pts).label("avg_pts"),
         func.avg(PlayerGameStat.reb).label("avg_reb"),
         func.avg(PlayerGameStat.ast).label("avg_ast"),
+        func.avg(PlayerGameStat.stl).label("avg_stl"),
+        func.avg(PlayerGameStat.blk).label("avg_blk"),
         func.avg(PlayerGameStat.minutes).label("avg_minutes"),
         fg_pct,
         home_avg_pts,

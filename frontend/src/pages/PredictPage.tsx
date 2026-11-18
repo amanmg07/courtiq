@@ -108,6 +108,17 @@ export default function PredictPage() {
 
   const l10 = trend.data?.points.length ? trend.data.points[trend.data.points.length - 1] : null
   const careerSeason = seasonAvg.data?.by_season[seasonAvg.data.by_season.length - 1]
+
+  // STL/BLK have no precomputed L10 field (only pts/reb/ast do, in
+  // player_game_features, for ML use) -- average the raw per-game values
+  // from the already-fetched last-10-games trend points instead.
+  function avgLastN(key: 'stl' | 'blk'): number | null {
+    const points = trend.data?.points
+    if (!points || points.length === 0) return null
+    return points.reduce((sum, p) => sum + p[key], 0) / points.length
+  }
+  const stlL10 = avgLastN('stl')
+  const blkL10 = avgLastN('blk')
   const hasUpcoming = !!(player && upcoming.data && upcoming.data.games.length > 0)
 
   return (
@@ -303,13 +314,15 @@ export default function PredictPage() {
             {(seasonAvg.loading || trend.loading) && <LoadingState />}
             {seasonAvg.error && <ErrorState message={seasonAvg.error} />}
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-muted">Last 10 Games</p>
                 <div className="space-y-2">
                   <StatCard label="PTS" value={l10?.pts_l10_avg?.toFixed(1) ?? '—'} accent="series-1" />
                   <StatCard label="REB" value={l10?.reb_l10_avg?.toFixed(1) ?? '—'} accent="series-2" />
                   <StatCard label="AST" value={l10?.ast_l10_avg?.toFixed(1) ?? '—'} accent="series-3" />
+                  <StatCard label="STL" value={stlL10?.toFixed(1) ?? '—'} accent="series-4" />
+                  <StatCard label="BLK" value={blkL10?.toFixed(1) ?? '—'} accent="series-5" />
                 </div>
               </div>
               <div>
@@ -318,6 +331,8 @@ export default function PredictPage() {
                   <StatCard label="PTS" value={careerSeason?.avg_pts.toFixed(1) ?? '—'} accent="series-1" />
                   <StatCard label="REB" value={careerSeason?.avg_reb.toFixed(1) ?? '—'} accent="series-2" />
                   <StatCard label="AST" value={careerSeason?.avg_ast.toFixed(1) ?? '—'} accent="series-3" />
+                  <StatCard label="STL" value={careerSeason?.avg_stl.toFixed(1) ?? '—'} accent="series-4" />
+                  <StatCard label="BLK" value={careerSeason?.avg_blk.toFixed(1) ?? '—'} accent="series-5" />
                 </div>
               </div>
               <div>
@@ -328,6 +343,8 @@ export default function PredictPage() {
                   <StatCard label="PTS" value={matchup.data?.avg_pts?.toFixed(1) ?? '—'} accent="series-1" />
                   <StatCard label="REB" value={matchup.data?.avg_reb?.toFixed(1) ?? '—'} accent="series-2" />
                   <StatCard label="AST" value={matchup.data?.avg_ast?.toFixed(1) ?? '—'} accent="series-3" />
+                  <StatCard label="STL" value={matchup.data?.avg_stl?.toFixed(1) ?? '—'} accent="series-4" />
+                  <StatCard label="BLK" value={matchup.data?.avg_blk?.toFixed(1) ?? '—'} accent="series-5" />
                 </div>
               </div>
             </div>
