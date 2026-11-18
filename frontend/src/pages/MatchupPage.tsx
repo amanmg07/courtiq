@@ -27,9 +27,14 @@ export default function MatchupPage() {
     [player?.player_id, opponent],
   )
 
+  // Numeric timestamp, not a formatted string: a string x-axis is a CATEGORY
+  // axis in Recharts, giving every meeting equal pixel spacing regardless of
+  // the real gap between them -- misleading here specifically, since meetings
+  // against one opponent are naturally clustered (teams play 2-4x/season)
+  // with irregular gaps between clusters, including the off-season.
   const chartData = data
     ? [...data.recent_games].reverse().map((g) => ({
-        date: formatDate(g.game_date),
+        date: new Date(g.game_date).getTime(),
         pts: g.pts,
         isHome: g.is_home,
       }))
@@ -155,9 +160,19 @@ export default function MatchupPage() {
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                   <CartesianGrid stroke="var(--color-grid)" vertical={false} />
-                  <XAxis dataKey="date" stroke="var(--color-baseline)" tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }} tickLine={false} axisLine={{ stroke: 'var(--color-baseline)' }} />
+                  <XAxis
+                    dataKey="date"
+                    type="number"
+                    scale="time"
+                    domain={['dataMin', 'dataMax']}
+                    tickFormatter={(ts: number) => formatDate(new Date(ts).toISOString())}
+                    stroke="var(--color-baseline)"
+                    tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={{ stroke: 'var(--color-baseline)' }}
+                  />
                   <YAxis stroke="var(--color-baseline)" tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
-                  <Tooltip content={<ChartTooltip />} />
+                  <Tooltip content={<ChartTooltip />} labelFormatter={(ts) => formatDate(new Date(Number(ts)).toISOString())} />
                   <Bar dataKey="pts" name="Points" radius={[3, 3, 0, 0]} isAnimationActive={false}>
                     {chartData.map((entry, i) => (
                       <Cell key={i} fill={entry.isHome ? 'var(--color-series-1)' : 'var(--color-series-7)'} />

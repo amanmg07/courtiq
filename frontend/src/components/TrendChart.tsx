@@ -20,8 +20,14 @@ function formatDate(iso: string) {
 }
 
 export default function TrendChart({ points, statKey, label }: Props) {
+  // A plain formatted-string x-axis is a CATEGORY axis in Recharts: every
+  // point gets equal pixel spacing regardless of the real gap between games
+  // -- a 9-day in-season gap and a ~190-day off-season gap would render
+  // identically. Using the real timestamp with a numeric axis instead makes
+  // spacing proportional to actual elapsed time, so gaps (rest days, the
+  // off-season) are visible rather than silently flattened away.
   const data = points.map((p) => ({
-    date: formatDate(p.game_date),
+    date: new Date(p.game_date).getTime(),
     opponent: p.opponent_abbr,
     actual: p[statKey],
     l5: p[`${statKey}_l5_avg` as const],
@@ -34,11 +40,15 @@ export default function TrendChart({ points, statKey, label }: Props) {
         <CartesianGrid stroke="var(--color-grid)" vertical={false} />
         <XAxis
           dataKey="date"
+          type="number"
+          scale="time"
+          domain={['dataMin', 'dataMax']}
+          tickFormatter={(ts: number) => formatDate(new Date(ts).toISOString())}
           stroke="var(--color-baseline)"
           tick={{ fill: 'var(--color-ink-muted)', fontSize: 11 }}
           tickLine={false}
           axisLine={{ stroke: 'var(--color-baseline)' }}
-          minTickGap={24}
+          minTickGap={32}
         />
         <YAxis
           stroke="var(--color-baseline)"
@@ -47,7 +57,7 @@ export default function TrendChart({ points, statKey, label }: Props) {
           axisLine={false}
           width={32}
         />
-        <Tooltip content={<ChartTooltip />} />
+        <Tooltip content={<ChartTooltip />} labelFormatter={(ts) => formatDate(new Date(Number(ts)).toISOString())} />
         <Legend wrapperStyle={{ fontSize: 12, color: 'var(--color-ink-secondary)' }} />
         <Line type="monotone" dataKey="actual" name={label} stroke={SERIES_COLOR} strokeWidth={2} dot={false} isAnimationActive={false} />
         <Line type="monotone" dataKey="l5" name="Last 5 avg" stroke={L5_COLOR} strokeWidth={2} dot={false} strokeDasharray="4 3" isAnimationActive={false} />
