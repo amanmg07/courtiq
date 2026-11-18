@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 interface PlotInsets {
   /** Rendered width of the YAxis, in px -- the plot area starts after it. */
@@ -8,11 +8,16 @@ interface PlotInsets {
 }
 
 /**
- * Scroll-wheel / trackpad zoom-and-pan for a time-scale chart:
- *  - pinch (or a plain vertical two-finger scroll) zooms in/out centered on
- *    the cursor -- a trackpad pinch dispatches as a ctrl+wheel event in
- *    every major browser, so no separate gesture handling is needed.
- *  - a horizontal two-finger swipe pans the visible window left/right.
+ * Scroll-wheel / trackpad-pinch zoom for a time-scale chart, centered on
+ * the cursor -- a trackpad pinch dispatches as a ctrl+wheel event in every
+ * major browser, so no separate gesture handling is needed; a plain
+ * vertical scroll zooms the same way. Panning is NOT driven by a swipe
+ * gesture here -- a horizontal two-finger swipe is too easily read as part
+ * of the zoom motion instead (there's no reliable way to tell "pan" from
+ * "an imprecise pinch" from deltaX/deltaY alone), so panning is exposed as
+ * `panBy`/`fullDomain` for a caller to drive from an explicit control (a
+ * draggable scrollbar, e.g. ChartPanBar) instead.
+ *
  * Returns the current window (null = full range) and the ref to attach to
  * the chart's wrapping div. The window is a math range only -- the caller
  * should still derive the actual rendered axis domain from whichever real
@@ -50,12 +55,41 @@ export function useWheelZoom(
   }, [points])
   const [fullMin, fullMax] = fullDomain
 
+  const countInRange = useCallback(
+    (min: number, max: number) => points.reduce((n, t) => (t >= min && t <= max ? n + 1 : n), 0),
+    [points],
+  )
+
+  const panBy = useCallback(
+    (deltaTime: number) => {
+      if (fullMax <= fullMin) return
+      setZoom((prev) => {
+        const [curMin, curMax] = prev ?? [fullMin, fullMax]
+        let newMin = curMin + deltaTime
+        let newMax = curMax + deltaTime
+        if (newMin < fullMin) {
+          newMax += fullMin - newMin
+          newMin = fullMin
+        }
+        if (newMax > fullMax) {
+          newMin -= newMax - fullMax
+          newMax = fullMax
+        }
+        newMin = Math.max(fullMin, newMin)
+        newMax = Math.min(fullMax, newMax)
+        if (countInRange(newMin, newMax) === 0) return prev
+        if (newMin <= fullMin && newMax >= fullMax) return null
+        return [newMin, newMax]
+      })
+    },
+    [fullMin, fullMax, countInRange],
+  )
+
   useEffect(() => {
     const el = containerRef.current
     if (!el || fullMax <= fullMin) return
     const fullSpan = fullMax - fullMin
     const minSpan = Math.max(fullSpan * 0.03, 24 * 60 * 60 * 1000)
-    const countInRange = (min: number, max: number) => points.reduce((n, t) => (t >= min && t <= max ? n + 1 : n), 0)
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
@@ -64,37 +98,19 @@ export function useWheelZoom(
       const plotRight = rect.right - insets.marginRight
       const plotWidth = Math.max(plotRight - plotLeft, 1)
 
-      // A horizontal swipe (no ctrl key -- that's reserved for pinch) pans;
-      // everything else (pinch, or a plain vertical scroll) zooms.
-      const isPan = !e.ctrlKey && Math.abs(e.deltaX) > Math.abs(e.deltaY)
-
       setZoom((prev) => {
         const [curMin, curMax] = prev ?? [fullMin, fullMax]
         const span = curMax - curMin
 
-        if (isPan) {
-          const shift = (e.deltaX / plotWidth) * span
-          let newMin = curMin + shift
-          let newMax = curMax + shift
-          if (newMin < fullMin) {
-            newMax += fullMin - newMin
-            newMin = fullMin
-          }
-          if (newMax > fullMax) {
-            newMin -= newMax - fullMax
-            newMax = fullMax
-          }
-          newMin = Math.max(fullMin, newMin)
-          newMax = Math.min(fullMax, newMax)
-          if (countInRange(newMin, newMax) === 0) return prev
-          if (newMin <= fullMin && newMax >= fullMax) return null
-          return [newMin, newMax]
-        }
-
         const frac = Math.min(1, Math.max(0, (e.clientX - plotLeft) / plotWidth))
         const cursorValue = curMin + frac * span
         const zoomingIn = e.deltaY < 0
-        const factor = zoomingIn ? 0.85 : 1.18
+        // Scale the step by how big this particular wheel tick was rather
+        // than a fixed jump per event -- a trackpad pinch/scroll reports
+        // many small deltas per gesture, so a fixed step feels choppy
+        // (every tick, however small, snapping the view by the same large
+        // amount). Clamped so one unusually large delta can't jump too far.
+        const factor = Math.min(1.5, Math.max(0.67, Math.exp(e.deltaY * 0.0025)))
         let newMin = cursorValue - (cursorValue - curMin) * factor
         let newMax = cursorValue + (curMax - cursorValue) * factor
         newMin = Math.max(fullMin, newMin)
@@ -126,7 +142,7 @@ export function useWheelZoom(
 
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [points, fullMin, fullMax, insets.marginLeft, insets.marginRight, insets.yAxisWidth])
+  }, [fullMin, fullMax, countInRange, insets.marginLeft, insets.marginRight, insets.yAxisWidth])
 
-  return { containerRef, zoom, setZoom }
+  return { containerRef, zoom, setZoom, panBy, fullDomain }
 }

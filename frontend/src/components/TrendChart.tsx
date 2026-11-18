@@ -3,6 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import ChartTooltip from './ChartTooltip'
+import ChartPanBar from './ChartPanBar'
 import { useWheelZoom } from '../hooks/useWheelZoom'
 import type { TrendPoint } from '../types/api'
 
@@ -43,7 +44,7 @@ export default function TrendChart({ points, statKey, label }: Props) {
 
   const dates = useMemo(() => data.map((d) => d.date), [data])
 
-  const { containerRef, zoom, setZoom } = useWheelZoom(dates, points, {
+  const { containerRef, zoom, setZoom, panBy, fullDomain } = useWheelZoom(dates, points, {
     yAxisWidth: Y_AXIS_WIDTH,
     marginLeft: MARGIN.left,
     marginRight: MARGIN.right,
@@ -89,8 +90,9 @@ export default function TrendChart({ points, statKey, label }: Props) {
           <Line type="monotone" dataKey="l10" name="Last 10 avg" stroke={L10_COLOR} strokeWidth={2} dot={false} strokeDasharray="1 3" isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
+      <ChartPanBar zoom={zoom} fullDomain={fullDomain} onPan={panBy} />
       <div className="mt-1 flex items-center justify-between text-[11px] text-ink-muted">
-        <span>Scroll or pinch over the chart to zoom</span>
+        <span>Scroll or pinch to zoom · drag the bar below to pan</span>
         {zoom && (
           <button onClick={() => setZoom(null)} className="font-medium text-series-1 hover:underline">
             Reset zoom

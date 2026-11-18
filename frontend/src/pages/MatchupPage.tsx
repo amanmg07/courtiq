@@ -10,6 +10,7 @@ import PlayerAutocomplete from '../components/PlayerAutocomplete'
 import TeamSelect from '../components/TeamSelect'
 import StatCard from '../components/StatCard'
 import ChartTooltip from '../components/ChartTooltip'
+import ChartPanBar from '../components/ChartPanBar'
 import PlayerAvatar from '../components/PlayerAvatar'
 import TeamLogo from '../components/TeamLogo'
 import type { PlayerOut } from '../types/api'
@@ -48,11 +49,13 @@ export default function MatchupPage() {
 
   const chartDates = useMemo(() => chartData.map((d) => d.date), [chartData])
 
-  const { containerRef: chartRef, zoom: chartZoom, setZoom: setChartZoom } = useWheelZoom(
-    chartDates,
-    data,
-    { yAxisWidth: 28, marginLeft: 0, marginRight: 16 },
-  )
+  const {
+    containerRef: chartRef,
+    zoom: chartZoom,
+    setZoom: setChartZoom,
+    panBy: panChartBy,
+    fullDomain: chartFullDomain,
+  } = useWheelZoom(chartDates, data, { yAxisWidth: 28, marginLeft: 0, marginRight: 16 })
 
   // Axis domain comes from whichever points fall inside the zoom/pan window
   // (dataMin/dataMax), not the raw window itself -- otherwise a window that
@@ -206,6 +209,7 @@ export default function MatchupPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              <ChartPanBar zoom={chartZoom} fullDomain={chartFullDomain} onPan={panChartBy} />
               <div className="mt-2 flex items-center justify-between text-xs text-ink-secondary">
                 <div className="flex gap-4">
                   <span className="flex items-center gap-1.5">
@@ -216,7 +220,7 @@ export default function MatchupPage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-ink-muted">
-                  <span className="text-[11px]">Scroll or pinch to zoom</span>
+                  <span className="text-[11px]">Scroll or pinch to zoom · drag the bar below to pan</span>
                   {chartZoom && (
                     <button onClick={() => setChartZoom(null)} className="text-[11px] font-medium text-series-1 hover:underline">
                       Reset zoom
