@@ -20,8 +20,8 @@ def compare_players(
     except ValueError:
         raise HTTPException(status_code=400, detail="player_ids must be a comma-separated list of integers")
 
-    if len(ids) < 2:
-        raise HTTPException(status_code=400, detail="Provide at least 2 player_ids to compare")
+    if len(ids) < 1:
+        raise HTTPException(status_code=400, detail="Provide at least 1 player_id")
     if len(ids) > 6:
         raise HTTPException(status_code=400, detail="At most 6 players can be compared at once")
 

@@ -136,8 +136,16 @@ def test_matchup_unknown_opponent_is_empty_not_error():
     assert r.json()["games_played"] == 0
 
 
-def test_compare_requires_at_least_two_players():
+def test_compare_allows_a_single_player():
+    """Relaxed from requiring 2+: the frontend now renders the comparison
+    chart/table progressively as players are added, starting from 1."""
     r = client.get("/api/compare", params={"player_ids": str(LEBRON_ID)})
+    assert r.status_code == 200
+    assert len(r.json()["players"]) == 1
+
+
+def test_compare_rejects_empty_player_list():
+    r = client.get("/api/compare", params={"player_ids": ""})
     assert r.status_code == 400
 
 

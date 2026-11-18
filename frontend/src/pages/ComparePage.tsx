@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { api } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
-import { LoadingState, ErrorState, EmptyState } from '../components/StatusStates'
+import { LoadingState, ErrorState } from '../components/StatusStates'
 import PlayerAutocomplete from '../components/PlayerAutocomplete'
 import ComparisonBarChart from '../components/ComparisonBarChart'
 import PlayerAvatar from '../components/PlayerAvatar'
@@ -26,9 +26,13 @@ export default function ComparePage() {
   // and comment in PlayerAutocomplete.tsx for the sharper version of this bug)
   const ids = useMemo(() => selected.map((p) => p.player_id), [selected])
   const { data, loading, error } = useFetch(
-    () => (ids.length >= 2 ? api.compare(ids, season || undefined) : null),
+    () => (ids.length >= 1 ? api.compare(ids, season || undefined) : null),
     [ids.join(','), season],
   )
+  // Chart/table are always on screen (not gated behind a "2 players" empty
+  // state) -- they just start with nothing to draw and fill in as players
+  // are added, per the user's explicit request.
+  const players = data?.players ?? []
 
   return (
     <div className="space-y-6">
@@ -86,35 +90,39 @@ export default function ComparePage() {
         </div>
       )}
 
-      {selected.length < 2 && <EmptyState message="Add at least 2 players to see a comparison." />}
-      {loading && <LoadingState />}
       {error && <ErrorState message={error} />}
 
-      {data && data.players.length >= 2 && (
-        <div className="space-y-6">
-          <div className="rounded-lg border border-border bg-surface-1 p-4">
-            <ComparisonBarChart players={data.players} />
-          </div>
+      <div className="space-y-6">
+        <div className="rounded-lg border border-border bg-surface-1 p-4">
+          {loading && players.length === 0 ? <LoadingState /> : <ComparisonBarChart players={players} />}
+        </div>
 
-          <div className="overflow-x-auto rounded-lg border border-border bg-surface-1">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-ink-muted">
-                  <th className="px-4 py-3">Player</th>
-                  <th className="px-4 py-3 text-right">GP</th>
-                  <th className="px-4 py-3 text-right">MIN</th>
-                  <th className="px-4 py-3 text-right">PTS</th>
-                  <th className="px-4 py-3 text-right">REB</th>
-                  <th className="px-4 py-3 text-right">AST</th>
-                  <th className="px-4 py-3 text-right">STL</th>
-                  <th className="px-4 py-3 text-right">BLK</th>
-                  <th className="px-4 py-3 text-right">FG%</th>
-                  <th className="px-4 py-3 text-right">3P%</th>
-                  <th className="px-4 py-3 text-right">FT%</th>
+        <div className="overflow-x-auto rounded-lg border border-border bg-surface-1">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-ink-muted">
+                <th className="px-4 py-3">Player</th>
+                <th className="px-4 py-3 text-right">GP</th>
+                <th className="px-4 py-3 text-right">MIN</th>
+                <th className="px-4 py-3 text-right">PTS</th>
+                <th className="px-4 py-3 text-right">REB</th>
+                <th className="px-4 py-3 text-right">AST</th>
+                <th className="px-4 py-3 text-right">STL</th>
+                <th className="px-4 py-3 text-right">BLK</th>
+                <th className="px-4 py-3 text-right">FG%</th>
+                <th className="px-4 py-3 text-right">3P%</th>
+                <th className="px-4 py-3 text-right">FT%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {players.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="px-4 py-6 text-center text-ink-muted">
+                    Add a player above to start comparing.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {data.players.map((entry, i) => (
+              ) : (
+                players.map((entry, i) => (
                   <tr key={entry.player.player_id} className="border-b border-border/50 last:border-0">
                     <td className="px-4 py-2.5 font-medium text-ink-primary">
                       <div className="flex items-center gap-2.5">
@@ -135,12 +143,12 @@ export default function ComparePage() {
                     <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{pct(entry.stats.fg3_pct)}</td>
                     <td className="tabular px-4 py-2.5 text-right text-ink-secondary">{pct(entry.stats.ft_pct)}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </div>
   )
 }
