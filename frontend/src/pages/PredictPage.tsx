@@ -2,11 +2,13 @@ import { useEffect } from 'react'
 import { api, ApiRequestError } from '../api/client'
 import { useFetch } from '../hooks/useFetch'
 import { usePersistentState } from '../hooks/usePersistentState'
+import { useTeam } from '../hooks/useTeams'
 import { LoadingState, ErrorState, EmptyState } from '../components/StatusStates'
 import PlayerAutocomplete from '../components/PlayerAutocomplete'
 import TeamSelect from '../components/TeamSelect'
 import StatCard from '../components/StatCard'
 import PlayerAvatar from '../components/PlayerAvatar'
+import TeamLogo from '../components/TeamLogo'
 import TeamBadge from '../components/TeamBadge'
 import type { PlayerOut, PredictionResponse, StatPrediction } from '../types/api'
 
@@ -37,11 +39,32 @@ function formatShortcutDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+function LocationToggle({ isHome, onChange }: { isHome: boolean; onChange: (home: boolean) => void }) {
+  return (
+    <div className="flex gap-1 rounded-md border border-border bg-page p-1">
+      <button
+        onClick={() => onChange(true)}
+        className={`flex-1 rounded px-3 py-1.5 text-sm ${isHome ? 'bg-surface-2 text-ink-primary' : 'text-ink-secondary'}`}
+      >
+        Home
+      </button>
+      <button
+        onClick={() => onChange(false)}
+        className={`flex-1 rounded px-3 py-1.5 text-sm ${!isHome ? 'bg-surface-2 text-ink-primary' : 'text-ink-secondary'}`}
+      >
+        Away
+      </button>
+    </div>
+  )
+}
+
 export default function PredictPage() {
   const [player, setPlayer] = usePersistentState<PlayerOut | null>('courtiq:predict:player', null)
   const [opponent, setOpponent] = usePersistentState('courtiq:predict:opponent', '')
   const [isHome, setIsHome] = usePersistentState('courtiq:predict:isHome', true)
   const [predictState, setPredictState] = usePersistentState<PredictCallState>('courtiq:predict:result', { status: 'idle' })
+  const playerTeam = useTeam(player?.current_team)
+  const opponentTeam = useTeam(opponent)
 
   // A persisted "loading" status means the request was abandoned when the
   // page unmounted mid-fetch (no promise survives a remount) -- without
@@ -85,6 +108,7 @@ export default function PredictPage() {
 
   const l10 = trend.data?.points.length ? trend.data.points[trend.data.points.length - 1] : null
   const careerSeason = seasonAvg.data?.by_season[seasonAvg.data.by_season.length - 1]
+  const hasUpcoming = !!(player && upcoming.data && upcoming.data.games.length > 0)
 
   return (
     <div className="space-y-6">
@@ -95,106 +119,154 @@ export default function PredictPage() {
         </p>
       </div>
 
-      <div>
-        <label className="mb-1 block text-xs text-ink-muted">Player</label>
-        <div className="max-w-sm">
-          {player ? (
-            <div className="flex items-center justify-between rounded-md border border-border bg-surface-1 px-3 py-2 text-sm">
-              <span className="flex items-center gap-2.5">
-                <PlayerAvatar src={player.headshot_url} name={player.full_name} size="sm" />
-                {player.full_name}
-                <TeamBadge abbreviation={player.current_team} />
-              </span>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Left: pick + display the player */}
+        <div className="flex min-h-[280px] flex-col rounded-xl border border-border bg-surface-1 p-5">
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-ink-muted">Player</p>
+          {!player ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+              <div className="h-16 w-16 rounded-full border-2 border-dashed border-border" />
+              <div className="w-full max-w-xs">
+                <PlayerAutocomplete onSelect={setPlayer} />
+              </div>
+              <p className="text-xs text-ink-muted">Search for a player to predict.</p>
+            </div>
+          ) : (
+            <div
+              className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg p-4 text-center"
+              style={{
+                background: playerTeam
+                  ? `linear-gradient(160deg, ${playerTeam.primary_color}26 0%, transparent 70%)`
+                  : undefined,
+              }}
+            >
+              <PlayerAvatar src={player.headshot_url} name={player.full_name} size="xl" ringColor={playerTeam?.primary_color} />
+              <div>
+                <h2 className="text-2xl font-bold text-ink-primary">{player.full_name}</h2>
+                <p className="mt-1 flex items-center justify-center gap-1.5 text-sm text-ink-secondary">
+                  {player.current_team && <TeamLogo abbreviation={player.current_team} size="sm" />}
+                  {playerTeam?.name ?? player.current_team}
+                </p>
+                <p className="text-xs text-ink-muted">
+                  {player.first_season}–{player.last_season} · {player.games_played} games
+                </p>
+              </div>
               <button
                 onClick={() => {
                   setPlayer(null)
                   setPredictState({ status: 'idle' })
                 }}
-                className="text-ink-muted hover:text-critical"
+                className="text-xs font-medium text-series-1 hover:underline"
               >
-                ×
+                Change player
               </button>
             </div>
+          )}
+        </div>
+
+        {/* Right: next games (once a player is picked) + opponent/location */}
+        <div className="flex min-h-[280px] flex-col rounded-xl border border-border bg-surface-1 p-5">
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-ink-muted">Opponent</p>
+
+          {hasUpcoming && !opponent && (
+            <div className="mb-4">
+              <p className="mb-2 text-xs text-ink-muted">{player!.full_name}'s next games — tap to predict</p>
+              <div className="flex flex-wrap gap-2">
+                {upcoming.data!.games.map((g) => (
+                  <button
+                    key={g.game_date}
+                    onClick={() => selectShortcut(g.opponent_abbr, g.is_home)}
+                    className="flex items-center gap-2 rounded-lg border border-border bg-page px-3 py-2 text-left text-sm transition-colors hover:bg-surface-2"
+                  >
+                    <TeamLogo abbreviation={g.opponent_abbr} size="sm" />
+                    <span>
+                      <span className="block text-ink-primary">{g.is_home ? 'vs' : '@'} {g.opponent_abbr}</span>
+                      <span className="block text-xs text-ink-muted">{formatShortcutDate(g.game_date)}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!opponent ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+              <div className="h-16 w-16 rounded-full border-2 border-dashed border-border" />
+              <div className="w-full max-w-xs">
+                <TeamSelect
+                  value={opponent}
+                  onChange={(v) => {
+                    setOpponent(v)
+                    setPredictState({ status: 'idle' })
+                  }}
+                  excludeAbbr={player?.current_team ?? undefined}
+                />
+              </div>
+              <p className="text-xs text-ink-muted">
+                {hasUpcoming ? 'Or pick any opponent manually.' : 'Pick the opponent team.'}
+              </p>
+            </div>
           ) : (
-            <PlayerAutocomplete onSelect={setPlayer} />
+            <div
+              className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg p-4 text-center"
+              style={{
+                background: opponentTeam
+                  ? `linear-gradient(160deg, ${opponentTeam.primary_color}26 0%, transparent 70%)`
+                  : undefined,
+              }}
+            >
+              <TeamLogo abbreviation={opponent} size="lg" />
+              <div>
+                <h2 className="text-2xl font-bold text-ink-primary">{opponentTeam?.name ?? opponent}</h2>
+                {opponentTeam && (
+                  <p className="mt-1 text-sm text-ink-secondary">
+                    {opponentTeam.conference}ern Conference · {opponentTeam.division} Division
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setOpponent('')
+                  setPredictState({ status: 'idle' })
+                }}
+                className="text-xs font-medium text-series-1 hover:underline"
+              >
+                Change opponent
+              </button>
+            </div>
           )}
         </div>
       </div>
 
-      {player && upcoming.data && upcoming.data.games.length > 0 && (
-        <div>
-          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
-            {player.full_name}'s Next Games — tap one to predict
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {upcoming.data.games.map((g) => (
-              <button
-                key={g.game_date}
-                onClick={() => selectShortcut(g.opponent_abbr, g.is_home)}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-surface-2 ${
-                  opponent === g.opponent_abbr && isHome === g.is_home
-                    ? 'border-series-1 bg-surface-2'
-                    : 'border-border bg-surface-1'
-                }`}
-              >
-                <div>
-                  <p className="text-ink-primary">
-                    {g.is_home ? 'vs' : '@'} <TeamBadge abbreviation={g.opponent_abbr} />
-                  </p>
-                  <p className="mt-0.5 text-xs text-ink-muted">{formatShortcutDate(g.game_date)}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="grid gap-3 sm:grid-cols-2 sm:max-w-md">
-        <div>
-          <label className="mb-1 block text-xs text-ink-muted">Or pick any opponent</label>
-          <TeamSelect
-            value={opponent}
-            onChange={(v) => {
-              setOpponent(v)
-              setPredictState({ status: 'idle' })
-            }}
-            excludeAbbr={player?.current_team ?? undefined}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-ink-muted">Location</label>
-          <div className="flex gap-1 rounded-md border border-border bg-surface-1 p-1">
-            <button
-              onClick={() => setIsHome(true)}
-              className={`flex-1 rounded px-2 py-1.5 text-sm ${isHome ? 'bg-surface-2 text-ink-primary' : 'text-ink-secondary'}`}
-            >
-              Home
-            </button>
-            <button
-              onClick={() => setIsHome(false)}
-              className={`flex-1 rounded px-2 py-1.5 text-sm ${!isHome ? 'bg-surface-2 text-ink-primary' : 'text-ink-secondary'}`}
-            >
-              Away
-            </button>
-          </div>
+      {/* One clear, single Location control -- was confusingly duplicated
+          inside the opponent panel before (once in the picker, again in the
+          "selected" display); centering it here between the two boxes reads
+          as a single step rather than something buried in either panel. */}
+      <div className="flex flex-col items-center gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Game Location</p>
+        <div className="w-full max-w-[220px]">
+          <LocationToggle isHome={isHome} onChange={setIsHome} />
         </div>
       </div>
-      <p className="-mt-3 text-xs text-ink-muted">
-        Home court does shift the prediction, but typically only slightly — our model found it to be one of the
-        weakest signals once a player's own home/away scoring split is already accounted for.
-      </p>
 
+      {/* Bottom: generate + the prediction result, once both sides are picked */}
       {!player || !opponent ? (
         <EmptyState message="Select a player and opponent to see predictions and current-form context." />
       ) : (
         <div className="space-y-6">
-          <button
-            onClick={() => runPrediction(opponent, isHome)}
-            disabled={predictState.status === 'loading'}
-            className="rounded-md bg-series-1 px-4 py-2 text-sm font-semibold text-page transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            {predictState.status === 'loading' ? 'Generating…' : 'Generate Prediction'}
-          </button>
+          <div className="flex justify-center">
+            <button
+              onClick={() => runPrediction(opponent, isHome)}
+              disabled={predictState.status === 'loading'}
+              className="rounded-md bg-series-1 px-6 py-2.5 text-sm font-semibold text-page transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {predictState.status === 'loading'
+                ? 'Generating…'
+                : predictState.status === 'result'
+                  ? 'Regenerate Prediction'
+                  : 'Generate Prediction'}
+            </button>
+          </div>
 
           {predictState.status === 'unavailable' && (
             <div className="rounded-lg border border-warning/40 bg-surface-1 p-4">
@@ -205,7 +277,7 @@ export default function PredictPage() {
 
           {predictState.status === 'result' && (
             <section>
-              <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-ink-primary">
+              <h2 className="mb-3 flex items-center justify-center gap-2 text-lg font-semibold text-ink-primary">
                 Predicted vs. <TeamBadge abbreviation={predictState.data.opponent_abbr} size="md" /> (
                 {predictState.data.is_home ? 'Home' : 'Away'})
               </h2>
@@ -214,12 +286,17 @@ export default function PredictPage() {
                   <PredictionCard key={m.key} label={m.label} stat={predictState.data[m.key]} accent={m.accent} />
                 ))}
               </div>
-              <p className="mt-3 text-xs text-ink-muted">
+              <p className="mt-3 text-center text-xs text-ink-muted">
                 {predictState.data.model_info}. MAE is the model's measured average error on a real, time-based
                 held-out test set — not a confidence score, but a concrete "typically off by about this much."
               </p>
             </section>
           )}
+
+          <p className="text-center text-xs text-ink-muted">
+            Home court does shift the prediction, but typically only slightly — our model found it to be one of the
+            weakest signals once a player's own home/away scoring split is already accounted for.
+          </p>
 
           <section>
             <h2 className="mb-3 text-lg font-semibold text-ink-primary">Current Form — Statistical Context</h2>
